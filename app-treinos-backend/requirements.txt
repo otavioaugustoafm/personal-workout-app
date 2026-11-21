@@ -1,0 +1,14 @@
+# Framework web e adaptador serverless (AWS Lambda)
+fastapi==0.110.0
+mangum==0.17.0
+uvicorn[standard]==0.28.0
+
+# Banco de dados (Neon / PostgreSQL)
+psycopg[binary]==3.3.4
+
+# Seguranca
+PyJWT==2.8.0
+bcrypt==4.1.2
+
+# Ambiente local
+python-dotenv==1.0.1

@@ -1,0 +1,29 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from mangum import Mangum
+
+from src.config import ALLOWED_ORIGINS, validar_config_api
+from src.routes import auth, treinos
+
+validar_config_api()
+
+app = FastAPI(title="API Treinos")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+app.include_router(auth.router)
+app.include_router(treinos.router)
+
+
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
+
+
+# Ponto de entrada da AWS Lambda
+handler = Mangum(app)
