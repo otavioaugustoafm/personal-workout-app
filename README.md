@@ -13,7 +13,8 @@ Uso pessoal, usuário único. **Separado do app financeiro** (outro repositório
 ## Roadmap
 
 - [x] **Fase 1** — app completo com login por senha única, banco, importação do backup da página antiga e deploy
-- [ ] **Fase 2** — sincronização com o Garmin (token pessoal da API): cardio e séries do relógio, com confirmação
+- [x] **Fase 1.1** — bike de rua e natação, gráficos de distância (treino, semana, mês, ano)
+- [x] **Fase 2** — sincronização com o Garmin (passo a passo no fim do [GUIA_DE_DEPLOY.md](GUIA_DE_DEPLOY.md)): cardio e séries do relógio, com confirmação
 - [ ] **Fase 3** — sono, HRV e Body Battery ao lado dos treinos
 
 ## Colocando no ar
@@ -29,6 +30,8 @@ app-treinos/
 ├── GUIA_DE_DEPLOY.md
 ├── app-treinos-backend/
 │   ├── migrations/001_schema_treinos.sql   tabelas + semana padrão + suas fichas
+│   ├── migrations/002_bike_rua_natacao.sql bike de rua e natação como opções
+│   ├── scripts/testar_garmin.py            teste da API pessoal do Garmin (gera relatório sem dados pessoais)
 │   ├── scripts/gerar_credenciais.py        hash da senha e segredo do login
 │   ├── scripts/montar_zip_lambda.py        gera o lambda.zip para Linux / Python 3.12
 │   ├── src/main.py                         FastAPI + handler da Lambda
@@ -112,7 +115,8 @@ Todas as rotas abaixo (menos o login) exigem `Authorization: Bearer <token>`.
 | POST | `/api/v1/backup/importar` | substitui tudo pelo backup, numa transação (se algo falhar, nada muda) |
 
 Itens: `A` Peito e Tríceps, `B` Costas e Bíceps, `C` Ombro e Antebraço, `D` Perna, `RQ` Corrida de qualidade, `RL` Corrida
-leve, `LG` Longão, `BK` Bike indoor, `BI` Bike intervalada, `OFF` Descanso.
+leve, `LG` Longão, `BK` Bike indoor, `BI` Bike intervalada, `BR` Bike de rua, `NT` Natação, `OFF` Descanso.
+A distância é sempre guardada em km (na natação o app mostra e recebe em metros).
 
 ## Testes
 

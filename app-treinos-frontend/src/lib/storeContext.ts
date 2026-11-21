@@ -11,6 +11,9 @@ export interface Store {
   excluirSessao: (id: string) => Promise<void>;
   excluirDia: (data: string) => Promise<void>;
   recarregar: () => Promise<void>;
+  usarGarmin: (atividadeId: string, s: Sessao) => Promise<boolean>;
+  ignorarGarmin: (atividadeId: string) => Promise<void>;
+  sincronizarGarmin: () => Promise<void>;
   aviso: (texto: string, erro?: boolean) => void;
 }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-  addDays, dateOf, ddmm, DIAS_C, DORES, fmtDateLong, fmtDur, fmtInt, fmtKg, fmtKm, fmtPace, fmtVel, isoOf, isoToday, ITEMS, MESES,
-  mondayOf, SENSACAO, type FichaId, type Sessao,
+  addDays, dateOf, ddmm, DIAS_C, DORES, emMetros, fmtDateLong, fmtDist, fmtDur, fmtInt, fmtKg, fmtKm, fmtPace, fmtRitmo, isoOf, isoToday, ITEMS, MESES,
+  MODALIDADES, mondayOf, SENSACAO, type FichaId, type Modalidade, type Sessao,
 } from "../lib/dominio";
 import { weekInfo } from "../lib/semana";
 import { useStore } from "../lib/storeContext";
@@ -116,7 +116,7 @@ function Mes() {
     const v = ss.filter((s) => s.kind === "forca").reduce((a, s) => a + volume(s), 0);
     semanas.push({ label: ddmm(ws), y: v, tip: `Semana de ${ddmm(ws)}\nVolume: ${fmtInt(v)} kg\nMusculação: ${ss.filter((s) => s.kind === "forca").length} · Cardio: ${ss.filter((s) => s.kind === "cardio").length}` });
   }
-  const legenda: [keyof typeof ITEMS, string][] = [["A", ITEMS.A.nome], ["B", ITEMS.B.nome], ["C", ITEMS.C.nome], ["D", ITEMS.D.nome], ["RQ", "Corrida"], ["BK", "Bike"]];
+  const legenda: [keyof typeof ITEMS, string][] = [["A", ITEMS.A.nome], ["B", ITEMS.B.nome], ["C", ITEMS.C.nome], ["D", ITEMS.D.nome], ["RQ", "Corrida"], ["BK", "Bike"], ["NT", "Natação"]];
   return (
     <>
       <div className="row">
@@ -249,61 +249,116 @@ function Musculacao() {
   );
 }
 
+type Periodo = "treino" | "semana" | "mes" | "ano";
+const PERIODOS: [Periodo, string][] = [["treino", "Por treino"], ["semana", "Semana"], ["mes", "Mês"], ["ano", "Ano"]];
+const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Distância agrupada: cada treino, as últimas 12 semanas, os últimos 12 meses ou todos os anos. */
+function pontosDistancia(todas: Sessao[], periodo: Periodo, mod: Modalidade): Ponto[] {
+  const m = emMetros(mod), val = (km: number) => (m ? Math.round(km * 1000) : km);
+  const un = (km: number) => fmtDist(km, mod);
+  const soma = (ss: Sessao[]) => ss.reduce((a, s) => a + (s.cardio?.dist || 0), 0);
+  const hoje = isoToday();
+  if (periodo === "treino") {
+    return todas.filter((s) => s.cardio?.dist).slice(-40).map((s) => ({
+      label: ddmm(s.data), y: val(s.cardio!.dist!), tip: `${fmtDateLong(s.data)} · ${ITEMS[s.item].nome}\n${un(s.cardio!.dist!)}${s.cardio!.dur_s ? " em " + fmtDur(s.cardio!.dur_s) : ""}`,
+    }));
+  }
+  if (periodo === "semana") {
+    const mon = mondayOf(hoje), out: Ponto[] = [];
+    for (let k = 11; k >= 0; k--) {
+      const ws = addDays(mon, -7 * k), we = addDays(ws, 6), ss = todas.filter((s) => s.data >= ws && s.data <= we), d = soma(ss);
+      out.push({ label: ddmm(ws), y: val(d), tip: `Semana de ${ddmm(ws)}\n${un(d)} · ${ss.length} ${ss.length === 1 ? "treino" : "treinos"}` });
+    }
+    return out;
+  }
+  if (periodo === "mes") {
+    const [y, mm] = hoje.split("-").map(Number), out: Ponto[] = [];
+    for (let k = 11; k >= 0; k--) {
+      const dt = new Date(y, mm - 1 - k, 1), chave = isoOf(dt).slice(0, 7), ss = todas.filter((s) => s.data.startsWith(chave)), d = soma(ss);
+      out.push({ label: `${MES_CURTO[dt.getMonth()]}/${String(dt.getFullYear()).slice(2)}`, y: val(d), tip: `${MESES[dt.getMonth()]} de ${dt.getFullYear()}\n${un(d)} · ${ss.length} ${ss.length === 1 ? "treino" : "treinos"}` });
+    }
+    return out;
+  }
+  const anos = [...new Set(todas.map((s) => s.data.slice(0, 4)))].sort();
+  if (!anos.includes(hoje.slice(0, 4))) anos.push(hoje.slice(0, 4));
+  return anos.map((a) => {
+    const ss = todas.filter((s) => s.data.startsWith(a)), d = soma(ss);
+    return { label: a, y: val(d), tip: `${a}\n${un(d)} · ${ss.length} ${ss.length === 1 ? "treino" : "treinos"}` };
+  });
+}
+
 function CardioHist() {
   const { S } = useStore();
-  const [mod, setMod] = useState<"corrida" | "bike">("corrida");
-  const corrida = mod === "corrida";
+  const [mod, setMod] = useState<Modalidade>("corrida");
+  const [periodo, setPeriodo] = useState<Periodo>("semana");
+  const m = emMetros(mod), comPace = mod === "corrida" || mod === "natacao";
   const todas = S.sessoes.filter((s) => s.kind === "cardio" && ITEMS[s.item].mod === mod).sort((a, b) => a.data.localeCompare(b.data) || a.ts - b.ts);
   const seg = (
     <div className="row" style={{ marginBottom: 4 }}>
       <div className="seg" role="group" aria-label="Modalidade">
-        {([["corrida", "Corrida"], ["bike", "Bike indoor"]] as const).map(([k, n]) => <button key={k} type="button" aria-pressed={k === mod} onClick={() => setMod(k)}>{n}</button>)}
+        {MODALIDADES.map(({ id, nome }) => <button key={id} type="button" aria-pressed={id === mod} onClick={() => setMod(id)}>{nome}</button>)}
       </div>
     </div>
   );
   if (!todas.length) return <>{seg}<div className="empty" style={{ marginTop: 12 }}>Nada registrado ainda. Ao marcar o cardio como feito na aba Hoje, anote distância, tempo e FC; eles aparecem aqui.</div></>;
-  const mesAtual = isoToday().slice(0, 7), doMes = todas.filter((s) => s.data.startsWith(mesAtual));
+  const hoje = isoToday(), mesAtual = hoje.slice(0, 7), anoAtual = hoje.slice(0, 4);
+  const doMes = todas.filter((s) => s.data.startsWith(mesAtual)), doAno = todas.filter((s) => s.data.startsWith(anoAtual));
   const soma = (arr: Sessao[], f: "dist" | "dur_s") => arr.reduce((a, s) => a + (s.cardio?.[f] || 0), 0);
   const ritmo = doMes.filter((s) => s.cardio?.dist && s.cardio?.dur_s);
   const dM = ritmo.reduce((a, s) => a + s.cardio!.dist!, 0), tM = ritmo.reduce((a, s) => a + s.cardio!.dur_s!, 0);
   const maior = Math.max(0, ...todas.map((s) => s.cardio?.dist || 0));
-  const mon = mondayOf(isoToday()), semanas: Ponto[] = [];
-  for (let k = 11; k >= 0; k--) {
-    const ws = addDays(mon, -7 * k), we = addDays(ws, 6), ss = todas.filter((s) => s.data >= ws && s.data <= we);
-    const v = corrida ? soma(ss, "dist") : soma(ss, "dur_s") / 60;
-    semanas.push({ label: ddmm(ws), y: v, tip: `Semana de ${ddmm(ws)}\n${corrida ? fmtKm(v) + " km" : Math.round(v) + " min"} · ${ss.length} ${ss.length === 1 ? "treino" : "treinos"}` });
-  }
-  const linha: Ponto[] = corrida
-    ? todas.filter((s) => s.cardio?.dist && s.cardio?.dur_s).map((s) => ({ label: ddmm(s.data), y: s.cardio!.dur_s! / s.cardio!.dist!,
-      tip: `${fmtDateLong(s.data)} · ${ITEMS[s.item].nome}\n${fmtKm(s.cardio!.dist!)} km em ${fmtDur(s.cardio!.dur_s)}\nPace ${fmtPace(s.cardio!.dur_s! / s.cardio!.dist!)} /km` }))
-    : todas.filter((s) => s.cardio?.dur_s).map((s) => ({ label: ddmm(s.data), y: s.cardio!.dur_s! / 60,
-      tip: `${fmtDateLong(s.data)} · ${ITEMS[s.item].nome}\n${fmtDur(s.cardio!.dur_s)}${s.cardio!.fc ? " · " + s.cardio!.fc + " bpm" : ""}` }));
+  const dist = pontosDistancia(todas, periodo, mod);
+  const fmtEixo = (n: number) => (m ? fmtInt(n) : fmtKm(n));
+  const linha: Ponto[] = comPace
+    ? todas.filter((s) => s.cardio?.dist && s.cardio?.dur_s).map((s) => {
+      const seg = m ? s.cardio!.dur_s! / (s.cardio!.dist! * 10) : s.cardio!.dur_s! / s.cardio!.dist!;
+      return { label: ddmm(s.data), y: seg, tip: `${fmtDateLong(s.data)} · ${ITEMS[s.item].nome}\n${fmtDist(s.cardio!.dist!, mod)} em ${fmtDur(s.cardio!.dur_s)}\n${fmtRitmo(s.cardio!.dist!, s.cardio!.dur_s!, mod)}` };
+    })
+    : todas.filter((s) => s.cardio?.dist && s.cardio?.dur_s).map((s) => ({
+      label: ddmm(s.data), y: s.cardio!.dist! / (s.cardio!.dur_s! / 3600),
+      tip: `${fmtDateLong(s.data)} · ${ITEMS[s.item].nome}\n${fmtDist(s.cardio!.dist!, mod)} em ${fmtDur(s.cardio!.dur_s)}\n${fmtRitmo(s.cardio!.dist!, s.cardio!.dur_s!, mod)}`,
+    }));
   const unidade = { fontSize: ".45em", opacity: 0.6, marginLeft: 4 };
+  const big = (km: number) => (m ? <>{fmtInt(km * 1000)}<small style={unidade}>m</small></> : <>{fmtKm(km)}<small style={unidade}>km</small></>);
   return (
     <>
       {seg}
       <div className="tiles">
-        <div className="tile"><div className="v">{doMes.length}</div><div className="l">{corrida ? "corridas" : "treinos"} neste mês</div></div>
-        {corrida && <div className="tile"><div className="v">{fmtKm(soma(doMes, "dist"))}<small style={unidade}>km</small></div><div className="l">no mês</div></div>}
+        <div className="tile"><div className="v">{doMes.length}</div><div className="l">treinos neste mês</div></div>
+        <div className="tile"><div className="v">{big(soma(doMes, "dist"))}</div><div className="l">no mês</div></div>
+        <div className="tile"><div className="v">{big(soma(doAno, "dist"))}</div><div className="l">em {anoAtual}</div></div>
         <div className="tile"><div className="v">{fmtDur(soma(doMes, "dur_s"))}</div><div className="l">de tempo no mês</div></div>
-        <div className="tile"><div className="v">{dM && tM ? (corrida ? fmtPace(tM / dM) : fmtVel(dM, tM)) : "—"}</div><div className="l">{corrida ? "pace médio do mês (/km)" : "velocidade média do mês (km/h)"}</div></div>
-        {corrida && <div className="tile"><div className="v">{fmtKm(maior)}<small style={unidade}>km</small></div><div className="l">maior distância registrada</div></div>}
+        <div className="tile"><div className="v" style={{ fontSize: 24 }}>{dM && tM ? fmtRitmo(dM, tM, mod) : "—"}</div><div className="l">{comPace ? "pace médio do mês" : "velocidade média do mês"}</div></div>
+        <div className="tile"><div className="v">{big(maior)}</div><div className="l">maior distância num treino</div></div>
       </div>
-      <div className="charts2">
-        <div className="chart"><h3>{corrida ? "Quilômetros por semana" : "Minutos por semana"}</h3><div className="cap">Últimas 12 semanas.</div>
-          {semanas.some((s) => s.y > 0) ? <GraficoBarras pts={semanas} fmt={corrida ? fmtKm : fmtInt} /> : <div className="empty">Anote distância e tempo para ver esse gráfico.</div>}</div>
-        <div className="chart"><h3>{corrida ? "Pace por corrida" : "Duração por treino"}</h3><div className="cap">{corrida ? "Minutos por km; quanto mais baixo, mais rápido." : "Em minutos."}</div>
-          {linha.length ? <GraficoLinha pts={linha} unidade={corrida ? "/km" : "min"} fmt={corrida ? fmtPace : fmtInt} /> : <div className="empty">Anote {corrida ? "distância e tempo" : "o tempo"} para ver esse gráfico.</div>}</div>
+      <div className="chart">
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <div><h3>Distância</h3><div className="cap">{periodo === "treino" ? "Cada treino (últimos 40)." : periodo === "semana" ? "Soma por semana, últimas 12." : periodo === "mes" ? "Soma por mês, últimos 12." : "Soma por ano."} Em {m ? "metros" : "km"}.</div></div>
+          <span className="spacer" />
+          <div className="seg" role="group" aria-label="Agrupar distância por">
+            {PERIODOS.map(([k, n]) => <button key={k} type="button" aria-pressed={k === periodo} onClick={() => setPeriodo(k)}>{n}</button>)}
+          </div>
+        </div>
+        {dist.some((p) => p.y > 0)
+          ? (periodo === "treino" && dist.length > 1 ? <GraficoLinha pts={dist} unidade={m ? "m" : "km"} fmt={fmtEixo} /> : <GraficoBarras pts={dist} fmt={fmtEixo} />)
+          : <div className="empty">Anote a distância dos treinos para ver esse gráfico.{mod === "bike" ? " Na bike indoor, use a do painel da bike." : ""}</div>}
+      </div>
+      <div className="chart">
+        <h3>{comPace ? (m ? "Pace por 100 m" : "Pace por corrida") : "Velocidade média por treino"}</h3>
+        <div className="cap">{comPace ? "Minutos; quanto mais baixo, mais rápido." : "Em km/h."}</div>
+        {linha.length ? <GraficoLinha pts={linha} unidade={comPace ? (m ? "/100 m" : "/km") : "km/h"} fmt={comPace ? fmtPace : fmtKm} />
+          : <div className="empty">Anote distância e tempo para ver esse gráfico.</div>}
       </div>
       <div className="chart"><h3>Registros</h3><div className="tbl-wrap"><table className="data">
-        <thead><tr><th>Data</th><th>Treino</th><th>Distância</th><th>Tempo</th><th>{corrida ? "Pace" : "Velocidade"}</th><th>FC</th><th>Sensação</th><th>Dores</th><th>Notas</th></tr></thead>
+        <thead><tr><th>Data</th><th>Treino</th><th>Distância</th><th>Tempo</th><th>{comPace ? "Pace" : "Velocidade"}</th><th>FC</th><th>Sensação</th><th>Dores</th><th>Notas</th></tr></thead>
         <tbody>{todas.slice().reverse().slice(0, 30).map((s) => {
           const c = s.cardio || { dist: null, dur_s: null, fc: null };
           return (
             <tr key={s.id}>
               <td>{fmtDateLong(s.data)}</td><td>{ITEMS[s.item].nome}</td>
-              <td className="mono">{c.dist ? fmtKm(c.dist) + " km" : "—"}</td><td className="mono">{fmtDur(c.dur_s)}</td>
-              <td className="mono">{c.dist && c.dur_s ? (corrida ? fmtPace(c.dur_s / c.dist) + " /km" : fmtVel(c.dist, c.dur_s) + " km/h") : "—"}</td>
+              <td className="mono">{c.dist ? fmtDist(c.dist, mod) : "—"}</td><td className="mono">{fmtDur(c.dur_s)}</td>
+              <td className="mono">{c.dist && c.dur_s ? fmtRitmo(c.dist, c.dur_s, mod) : "—"}</td>
               <td className="mono">{c.fc ? c.fc + " bpm" : "—"}</td><td>{s.sensacao ? SENSACAO[s.sensacao] : "—"}</td>
               <td style={doresAtivas(s).length ? { color: "var(--bad)" } : undefined}>{doresTexto(s, true) || "—"}</td><td className="mono">{s.notas}</td>
             </tr>

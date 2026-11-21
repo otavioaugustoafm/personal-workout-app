@@ -4,6 +4,7 @@ import { dayState, diaSemResposta, mainItem, treinoDeHoje, weekInfo, type Semana
 import { useStore } from "../lib/storeContext";
 import { cardioLine, doresTexto, exValido, volume } from "../lib/treino";
 import { fmtInt } from "../lib/dominio";
+import GarminFila from "./GarminFila";
 import Treino from "./Treino";
 
 export function ResumoSessao({ s }: { s: Sessao }) {
@@ -81,6 +82,8 @@ export default function Hoje() {
           </div>
         </div>
       )}
+
+      <GarminFila />
 
       <div className="strip" role="group" aria-label="Dias da semana">
         {w.dates.map((d, i) => {

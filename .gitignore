@@ -20,3 +20,8 @@ build/
 # Frontend
 node_modules/
 dist/
+
+# Teste do Garmin (dados pessoais: nunca commitar)
+relatorio_garmin.txt
+garmin_bruto/
+connect-personal-api-key

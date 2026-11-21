@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  DORES, fmtDateLong, isoToday, ITEMS, ITEM_IDS, uid, type Exercicio, type ItemId, type Nivel, type Rascunho, type Serie, type StatusEx,
+  DORES, emMetros, fmtDateLong, isoToday, ITEMS, ITEM_IDS, uid, type Exercicio, type ItemId, type Nivel, type Rascunho, type Serie, type StatusEx,
 } from "../lib/dominio";
 import { useStore } from "../lib/storeContext";
 import { calcCardio, dorPrincipal, exPendentes, kindLabel, lastFor, montarSessao, rascunhoAtual, seriesFrom, seriesText } from "../lib/treino";
@@ -15,7 +15,7 @@ export function OpcoesTreino({ comDescanso = true }: { comDescanso?: boolean }) 
   return (
     <>
       {grupo("Musculação", ["A", "B", "C", "D"])}
-      {grupo("Cardio", ["RQ", "RL", "LG", "BK", "BI"])}
+      {grupo("Cardio", ["RQ", "RL", "LG", "BK", "BI", "BR", "NT"])}
       {comDescanso && grupo("Outro", ["OFF"])}
     </>
   );
@@ -135,12 +135,15 @@ export default function Treino({ itemInicial, dataFixa, extra, onCancelar, onSal
         <div className="after" style={{ marginTop: 0 }}>
           <div className="card cardio-card" style={{ "--c": it.c } as React.CSSProperties} key={"c" + rev}>
             <h3 style={{ fontSize: 17 }}>Seus números</h3>
-            {(item === "BK" || item === "BI") && <p className="sub" style={{ margin: 0 }}>Banco na altura certa: joelho levemente dobrado com o pedal embaixo.</p>}
+            {it.mod === "bike" && <p className="sub" style={{ margin: 0 }}>O relógio não mede distância na bike indoor: anote a do painel da bike. Banco na altura certa: joelho levemente dobrado com o pedal embaixo.</p>}
             <div className="cgrid">
-              <div className="field"><label htmlFor="c-dist">Distância (km)</label>
-                <input id="c-dist" inputMode="decimal" placeholder={it.mod === "bike" ? "opcional" : "ex.: 10,5"}
-                  defaultValue={d.dist == null ? "" : String(d.dist).replace(".", ",")}
-                  onChange={(e) => { const v = e.target.value.trim(), n = parseFloat(v.replace(",", ".")); mudar((x) => { x.dist = v && !isNaN(n) ? n : null; }); }} /></div>
+              <div className="field"><label htmlFor="c-dist">Distância ({emMetros(it.mod) ? "m" : "km"})</label>
+                <input id="c-dist" inputMode="decimal" placeholder={emMetros(it.mod) ? "ex.: 1500" : it.mod === "bike" ? "do painel da bike" : "ex.: 10,5"}
+                  defaultValue={d.dist == null ? "" : emMetros(it.mod) ? String(Math.round(d.dist * 1000)) : String(d.dist).replace(".", ",")}
+                  onChange={(e) => {
+                    const v = e.target.value.trim(), n = emMetros(it.mod) ? parseFloat(v.replace(/[.\s]/g, "").replace(",", ".")) : parseFloat(v.replace(",", "."));
+                    mudar((x) => { x.dist = v && !isNaN(n) ? (emMetros(it.mod) ? n / 1000 : n) : null; });
+                  }} /></div>
               <div className="field"><label htmlFor="c-dur">Tempo (h:mm:ss)</label>
                 <input id="c-dur" inputMode="numeric" placeholder="ex.: 1:05:30" defaultValue={d.dur || ""}
                   onChange={(e) => mudar((x) => { x.dur = e.target.value.trim(); })} /></div>
@@ -150,10 +153,10 @@ export default function Treino({ itemInicial, dataFixa, extra, onCancelar, onSal
             </div>
             <div className="calc">
               {calcCardio(it.mod, d)
-                ? <>{it.mod === "bike" ? "Velocidade média" : "Pace médio"} <b>{calcCardio(it.mod, d)}</b></>
-                : <span className="sub">{it.mod === "bike" ? "Com distância e tempo, mostro a velocidade média." : "Com distância e tempo, calculo o pace."}</span>}
+                ? <>{it.mod === "corrida" || it.mod === "natacao" ? "Pace médio" : "Velocidade média"} <b>{calcCardio(it.mod, d)}</b></>
+                : <span className="sub">{it.mod === "corrida" || it.mod === "natacao" ? "Com distância e tempo, calculo o pace." : "Com distância e tempo, mostro a velocidade média."}</span>}
             </div>
-            <p className="sub" style={{ margin: 0 }}>Anote o que o relógio mostrou ao terminar. Na Fase 2 esses campos vêm preenchidos pelo Garmin.</p>
+            <p className="sub" style={{ margin: 0 }}>Se não anotar agora, o que o relógio registrou aparece em “Do Garmin” para você confirmar.</p>
           </div>
           <GarminBox kind="cardio" mod={it.mod} />
         </div>
@@ -341,17 +344,16 @@ function ComoFoi({ item, d, mudar, rev }: { item: ItemId; d: Rascunho; mudar: Ca
 }
 
 function GarminBox({ kind, mod }: { kind: "forca" | "cardio"; mod?: string }) {
-  const linhas = kind === "forca"
-    ? ["Duração total", "FC média / máx.", "Séries registradas pelo relógio", "Descanso médio", "Calorias"]
-    : ["Distância", "Tempo", mod === "bike" ? "Velocidade / potência" : "Pace médio", "FC média", mod === "bike" ? "Cadência (rpm)" : "Cadência (ppm)", "Efeito do treino"];
   return (
     <div className="card garmin">
-      <h3>O que o Garmin registrou</h3>
+      <h3>E o Garmin?</h3>
       <p className="sub" style={{ margin: 0 }}>
-        Chega na Fase 2, quando a sincronização com o relógio estiver ligada
-        {kind === "forca" ? ". O que você anotou continua valendo; o Garmin só completa o que ficar sem anotação, e você confirma." : "."}
+        {kind === "forca"
+          ? "Depois do treino, as séries do relógio aparecem em “Do Garmin”, na aba Hoje. O que você anotou aqui continua valendo; o Garmin só completa o que ficou sem anotação, e você confirma."
+          : mod === "bike"
+            ? "Depois do treino, tempo e FC vêm do relógio para você confirmar. A distância da bike indoor vem zerada: anote a sua."
+            : "Depois do treino, distância, tempo e FC vêm do relógio para você confirmar, junto com cadência e efeito do treino."}
       </p>
-      <dl>{linhas.map((l) => <div key={l} style={{ display: "contents" }}><dt>{l}</dt><dd>—</dd></div>)}</dl>
     </div>
   );
 }

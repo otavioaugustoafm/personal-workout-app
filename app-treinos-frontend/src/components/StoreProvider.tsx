@@ -56,6 +56,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     timers.current[chave] = setTimeout(() => { fn().catch(falhou); }, ms);
   };
 
+  const tirarDaFila = (id: string) => (s: Estado | null) =>
+    s && { ...s, garmin: s.garmin && { ...s.garmin, atividades: s.garmin.atividades.filter((a) => a.id !== id) } };
+
   const store: Store = {
     S,
     aviso,
@@ -92,17 +95,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
+    // apagar uma sessão devolve a atividade do Garmin dela para a fila: recarrega para ela reaparecer
     excluirSessao: async (id) => {
       try {
         await rotas.excluirSessao(id);
         setS((s) => s && { ...s, sessoes: s.sessoes.filter((x) => x.id !== id) });
+        if (S.garmin) recarregar();
       } catch (e) { falhou(e); }
     },
     excluirDia: async (data) => {
       try {
         await rotas.excluirDia(data);
         setS((s) => s && { ...s, sessoes: s.sessoes.filter((x) => x.data !== data) });
+        if (S.garmin) recarregar();
       } catch (e) { falhou(e); }
+    },
+    usarGarmin: async (atividadeId, sessao) => {
+      try {
+        const salva = await rotas.usarGarmin(atividadeId, sessao);
+        setS((s) => tirarDaFila(atividadeId)(s && { ...s, sessoes: [...s.sessoes.filter((x) => x.id !== salva.id), salva] }));
+        return true;
+      } catch (e) {
+        falhou(e);
+        return false;
+      }
+    },
+    ignorarGarmin: async (atividadeId) => {
+      try {
+        await rotas.ignorarGarmin(atividadeId);
+        setS(tirarDaFila(atividadeId));
+      } catch (e) { falhou(e); }
+    },
+    sincronizarGarmin: async () => {
+      try {
+        const r = await rotas.sincronizarGarmin();
+        await recarregar();
+        aviso(r.novas ? `${r.novas} atividade${r.novas > 1 ? "s" : ""} nova${r.novas > 1 ? "s" : ""} do Garmin` : "Nada novo no Garmin");
+      } catch (e) {
+        aviso(mensagemDeErro(e, "Não foi possível sincronizar com o Garmin."), true);
+        recarregar();
+      }
     },
   };
 

@@ -78,3 +78,14 @@ def test_importar_backup_da_pagina(cliente):
     ruim = dict(backup, sessoes=[{"id": "z", "data": "2026-11-20", "item": "??"}])
     assert cliente.post("/api/v1/backup/importar", json=ruim).status_code == 422
     assert len(cliente.get("/api/v1/estado").json()["sessoes"]) == 2     # backup ruim nao apagou nada
+
+
+def test_natacao_e_bike_de_rua(cliente):
+    n = cliente.post("/api/v1/sessoes", json={"id": "n1", "data": "2026-11-21", "item": "NT",
+                                              "cardio": {"dist": 1.5, "dur_s": 2100, "fc": 130}, "dores": {"ombro": "leve"}})
+    assert n.status_code == 201 and n.json()["kind"] == "cardio" and n.json()["cardio"]["dist"] == 1.5
+    assert cliente.post("/api/v1/sessoes", json={"id": "b1", "data": "2026-11-22", "item": "BR",
+                                                 "cardio": {"dist": 35, "dur_s": 4500, "fc": 140}}).status_code == 201
+    padrao = ["A", "RQ", "B", "D", "NT", "BR", "LG"]
+    assert cliente.put("/api/v1/configuracao", json={"semana_padrao": padrao}).status_code == 204
+    assert cliente.get("/api/v1/estado").json()["padrao"] == padrao

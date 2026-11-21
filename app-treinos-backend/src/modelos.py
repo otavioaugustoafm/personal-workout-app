@@ -4,14 +4,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-ITENS = ("A", "B", "C", "D", "RQ", "RL", "LG", "BK", "BI", "OFF")
+ITENS = ("A", "B", "C", "D", "RQ", "RL", "LG", "BK", "BI", "BR", "NT", "OFF")
 FICHAS = ("A", "B", "C", "D")
-Item = Literal["A", "B", "C", "D", "RQ", "RL", "LG", "BK", "BI", "OFF"]
+Item = Literal["A", "B", "C", "D", "RQ", "RL", "LG", "BK", "BI", "BR", "NT", "OFF"]
 Tipo = Literal["forca", "cardio", "descanso"]
 NivelDor = Literal["ok", "leve", "dor"]
 
 TIPO_DO_ITEM = {"A": "forca", "B": "forca", "C": "forca", "D": "forca",
-                "RQ": "cardio", "RL": "cardio", "LG": "cardio", "BK": "cardio", "BI": "cardio", "OFF": "descanso"}
+                "RQ": "cardio", "RL": "cardio", "LG": "cardio", "BK": "cardio", "BI": "cardio",
+                "BR": "cardio", "NT": "cardio", "OFF": "descanso"}
 
 
 class ConfiguracaoPayload(BaseModel):
@@ -66,6 +67,7 @@ class SessaoPayload(BaseModel):
     sensacao: Literal["leve", "ok", "pesado"] | None = None
     notas: str = Field("", max_length=2000)
     rapido: bool = False
+    garmin: dict[str, Any] | None = None  # dados extras da atividade do Garmin ligada a esta sessao
     ts: int | None = None  # momento do registro (ms), so para ordenar; o servidor usa o proprio relogio se faltar
 
     @field_validator("dores")

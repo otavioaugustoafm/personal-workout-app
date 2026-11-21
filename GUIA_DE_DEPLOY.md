@@ -250,8 +250,92 @@ Onde olhar: Lambda → aba **Monitor** → **View CloudWatch logs** → abra o l
   .zip file).
 - **Front-end:** é só `git push`; o Amplify faz o deploy sozinho.
 
-## Próxima fase (Garmin)
+## Fase 2: sincronização com o Garmin
 
-A sincronização com o Garmin vai ser uma segunda Lambda (`treinos-sync-garmin`, com o mesmo zip) chamada por um
-agendamento do **EventBridge Scheduler**, com o token pessoal da API do Garmin numa variável de ambiente só dela. O
-banco já tem o campo `garmin` em cada treino esperando por isso.
+Ideia geral: uma **segunda Lambda** (`treinos-sync-garmin`), com o **mesmo zip**, busca as atividades do relógio de hora
+em hora e guarda no banco. **Só ela conhece a chave do Garmin.** A API só lê o que ela gravou e, quando você aperta
+"Sincronizar agora", pede para ela rodar. Nada entra no seu histórico sem você confirmar no app.
+
+Custo: continua zero. São 24 execuções curtas por dia (a cota grátis da Lambda é de 1 milhão por mês) e o EventBridge
+Scheduler tem 14 milhões de chamadas grátis por mês.
+
+### F2.1 Banco
+
+No SQL Editor do Neon, rode o conteúdo de `migrations/003_garmin.sql`. Ele só **cria** duas tabelas novas
+(`garmin_atividades` e `garmin_estado`) e não mexe nos seus treinos.
+
+### F2.2 Atualizar a API
+
+1. Na pasta `app-treinos-backend`: `py scripts\montar_zip_lambda.py`.
+2. Na `treinos-api` → Code → Upload from → .zip file → o `lambda.zip` novo.
+3. **Configuration → General configuration → Edit → Timeout: 60 s.** O "Sincronizar agora" espera a outra Lambda
+   terminar.
+
+### F2.3 Lambda de sincronização
+
+Lambda → **Create function** → *Author from scratch*: nome `treinos-sync-garmin`, **Python 3.12**, **x86_64**, role
+padrão. Depois:
+
+1. Code → Upload from → .zip file → **o mesmo `lambda.zip`**.
+2. Runtime settings → Edit → **Handler: `src.garmin.handler`**.
+3. General configuration → **Memory 256 MB**, **Timeout 60 s**.
+4. Environment variables (sem aspas):
+
+| Variável | Valor |
+|---|---|
+| `DATABASE_URL` | a mesma da `treinos-api` |
+| `GARMIN_PERSONAL_API_KEY` | a sua chave pessoal do Garmin (a mesma do arquivo `connect-personal-api-key`) |
+| `GARMIN_CHAVE_EXPIRA` | a data em que a chave expira, no formato `AAAA-MM-DD`. O app avisa 14 dias antes |
+
+5. Tags → `Projeto` = `treinos`.
+6. **Primeira carga:** aba **Test** → evento novo com o corpo `{"dias": 30}` → **Test**. Deve terminar com algo como
+   `{"novas": 14, "vistas": 14}`. Isso traz o último mês; só aparecem no app as atividades a partir do dia em que você
+   começou a usar o app.
+
+> A chave não vai para o GitHub, não vai para o zip e não aparece no app. Se um dia ela vazar, apague-a no Garmin
+> Connect e gere outra; depois é só trocar a variável aqui.
+
+### F2.4 Agendamento (de hora em hora)
+
+Console AWS → **EventBridge** → **Scheduler** → **Schedules** → **Create schedule**:
+
+1. Nome `treinos-sync-garmin-hora`. **Recurring schedule** → **Rate-based** → `1` **hours**.
+   Flexible time window: **Off**.
+2. Target: **AWS Lambda → Invoke** → função `treinos-sync-garmin`. Payload: deixe `{}`.
+3. Permissions: **Create new role for this schedule** (a AWS cria a permissão para o agendamento chamar a Lambda).
+4. Retry policy: desligue os retries (se falhar, a próxima hora tenta de novo). **Create schedule**.
+
+### F2.5 Botão "Sincronizar agora"
+
+A `treinos-api` precisa de permissão para chamar a outra Lambda:
+
+1. Na `treinos-api` → Configuration → **Permissions** → clique no nome da **Role** (abre o IAM).
+2. **Add permissions → Create inline policy → JSON**, cole (troque `SUA_CONTA` pelo número da sua conta, que aparece
+   no canto superior direito do console, e a região se não for `us-east-2`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "lambda:InvokeFunction",
+    "Resource": "arn:aws:lambda:us-east-2:SUA_CONTA:function:treinos-sync-garmin"
+  }]
+}
+```
+
+3. Nome `invocar-sync-garmin` → **Create policy**.
+4. Na `treinos-api` → Environment variables → adicione `GARMIN_SYNC_FUNCTION` = `treinos-sync-garmin`.
+
+### F2.6 Conferir
+
+Abra o app. Em **Hoje** aparece o cartão **Do Garmin** com "sincronizado há …" e as atividades esperando
+confirmação. Toque em **Revisar**, confira e **Confirmar e salvar**.
+
+| Sintoma | Causa provável | Onde mexer |
+|---|---|---|
+| Cartão "Do Garmin" não aparece | migração 003 não rodou, ou API antiga | F2.1 e F2.2 |
+| "Sincronização manual não configurada" | falta `GARMIN_SYNC_FUNCTION` | F2.5 |
+| "A sincronização com o Garmin falhou: ... AccessDenied" | falta a política do F2.5 | F2.5 |
+| "A última sincronização falhou: ... 401" | chave errada ou expirada | troque `GARMIN_PERSONAL_API_KEY` |
+| Treino de musculação não aparece logo após terminar | o .FIT ainda não estava pronto | aparece na próxima hora (ou "Sincronizar agora") |

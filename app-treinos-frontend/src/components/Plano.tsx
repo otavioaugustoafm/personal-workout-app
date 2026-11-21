@@ -94,8 +94,7 @@ function EditorFichas() {
         ) : <button className="btn small" type="button" onClick={() => setRestaurar(true)}>Restaurar ficha original</button>}
       </div>
       <p className="sub" style={{ margin: "0 0 12px", maxWidth: "85ch" }}>
-        As mudanças valem a partir do próximo treino e ficam salvas na hora. Renomear um exercício mantém o histórico dele. O <b>nome no Garmin</b> é o nome que
-        o relógio mostra para esse exercício; é ele que liga as séries do Garmin às suas na Fase 2.
+        As mudanças valem a partir do próximo treino e ficam salvas na hora. Renomear um exercício mantém o histórico dele. O <b>nome no Garmin</b> é o nome da biblioteca do relógio para esse exercício (o app aprende sozinho na primeira confirmação). Para ligar com certeza, escreva o nome do exercício do app na <b>descrição</b> do passo, no treino do Garmin Connect.
       </p>
       <div className="edit-list">
         {f.map((e, n) => (

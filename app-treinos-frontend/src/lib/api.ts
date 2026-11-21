@@ -54,5 +54,8 @@ export const rotas = {
   rascunho: (item: ItemId, dados: Rascunho) => api.put(`/api/v1/rascunhos/${item}`, { dados }),
   excluirRascunho: (item: ItemId) => api.delete(`/api/v1/rascunhos/${item}`),
   backup: () => api.get<Estado>("/api/v1/backup").then((r) => r.data),
+  usarGarmin: (id: string, sessao: Sessao) => api.post<Sessao>(`/api/v1/garmin/${id}/usar`, { sessao }).then((r) => r.data),
+  ignorarGarmin: (id: string) => api.post(`/api/v1/garmin/${id}/ignorar`),
+  sincronizarGarmin: () => api.post<{ novas: number }>("/api/v1/garmin/sincronizar", null, { timeout: 70000 }).then((r) => r.data),
   importar: (backup: unknown) => api.post<{ sessoes: number }>("/api/v1/backup/importar", backup).then((r) => r.data),
 };

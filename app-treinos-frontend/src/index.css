@@ -15,7 +15,7 @@
   --gold:#f0bf4c; --gold-strong:#ffd36e; --gold-ink:#2a2208; --gold-bg:rgba(240,191,76,.10); --gold-line:rgba(240,191,76,.40);
   --accent:var(--gold); --accent-ink:var(--gold-ink);
   --chart:#6fe0b4;
-  --c-a:#3987e5; --c-b:#2fc18c; --c-c:#9085e9; --c-d:#e0a32e; --c-run:#ef6a4c; --c-bike:#3bb54a; --c-off:#56717a;
+  --c-a:#3987e5; --c-b:#2fc18c; --c-c:#9085e9; --c-d:#e0a32e; --c-run:#ef6a4c; --c-bike:#3bb54a; --c-off:#56717a; --c-swim:#4aa8e0;
   --ok:#6fe0b4; --warn:#f4b860; --bad:#ff8b7b; --info:#8cc8ff;
   --ok-bg:rgba(111,224,180,.10); --warn-bg:rgba(244,184,96,.12); --bad-bg:rgba(255,139,123,.10); --info-bg:rgba(140,200,255,.12);
   --display:"Bricolage Grotesque Variable","Instrument Sans Variable",ui-sans-serif,system-ui,sans-serif;
@@ -312,3 +312,19 @@ table.data td.mono{font-size:13px;color:var(--muted)}
 .login h1{font-family:var(--display);font-size:40px;font-weight:600;line-height:1;letter-spacing:-.03em}
 .tab-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
 button{font:inherit}
+.tbl-wrap table.data th,.tbl-wrap table.data td{white-space:nowrap}
+.tbl-wrap table.data td:last-child{white-space:normal;min-width:140px}
+
+/* ---------- Fase 2: Garmin ---------- */
+.gfila{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.grow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 0;border-top:1px solid var(--line-soft)}
+.grow .gdia{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;min-width:74px}
+.grow .gtxt{display:flex;flex-direction:column;flex:1;min-width:180px}
+.grev{display:flex;flex-direction:column;gap:14px;margin-bottom:16px}
+.gex{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--line-soft)}
+.gex select.inp{max-width:100%;min-width:0;flex:1 1 240px}
+.gseries{display:flex;flex-direction:column;gap:6px}
+.gs{display:flex;align-items:center;gap:8px}
+.gs > .sub:first-child{min-width:74px}
+.gs .inp{width:72px;padding:6px 8px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}

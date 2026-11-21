@@ -1,6 +1,6 @@
 // Regras do treino do dia: rascunho, cargas sugeridas, volume, dores e o registro final.
 import {
-  DORES, fmtDur, fmtKg, fmtKm, fmtPace, fmtVel, isoToday, ITEMS, NIVEL, parseDur,
+  DORES, fmtDist, fmtDur, fmtKg, fmtRitmo, isoToday, ITEMS, NIVEL, parseDur,
   type Estado, type Exercicio, type ExercicioSessao, type ItemId, type Nivel, type Rascunho, type Serie, type Sessao,
 } from "./dominio";
 
@@ -77,23 +77,27 @@ export function cardioLine(s: Sessao): string {
   const c = s.cardio;
   if (!c || (!c.dist && !c.dur_s)) return "";
   const mod = ITEMS[s.item].mod, parts: string[] = [];
-  if (c.dist) parts.push(fmtKm(c.dist) + " km");
+  if (c.dist) parts.push(fmtDist(c.dist, mod));
   if (c.dur_s) parts.push(fmtDur(c.dur_s));
-  if (c.dist && c.dur_s) parts.push(mod === "bike" ? fmtVel(c.dist, c.dur_s) + " km/h" : fmtPace(c.dur_s / c.dist) + " /km");
+  if (c.dist && c.dur_s) parts.push(fmtRitmo(c.dist, c.dur_s, mod));
   if (c.fc) parts.push(c.fc + " bpm");
+  const g = (s.garmin || {}) as { cadencia?: number | null; te_aerobico?: number | null };
+  if (g.cadencia) parts.push(`${g.cadencia} ${mod === "corrida" ? "ppm" : "rpm"}`);
+  if (g.te_aerobico) parts.push(`efeito ${fmtKg(g.te_aerobico)}`);
   return parts.join(" · ");
 }
 
 export function calcCardio(mod: string | undefined, d: Rascunho): string | null {
   const dur = parseDur(d.dur), dist = d.dist;
   if (!dur || !dist) return null;
-  return mod === "bike" ? `${fmtVel(dist, dur)} km/h` : `${fmtPace(dur / dist)} /km`;
+  return fmtRitmo(dist, dur, mod as never);
 }
 
 // ---------- dores ----------
-/** A articulação principal depende do treino: joelho em perna e cardio, cotovelo nos treinos de cima. */
+/** A articulação principal depende do treino: joelho em perna, corrida e bike; ombro na natação; cotovelo nos treinos de cima. */
 export function dorPrincipal(item: ItemId): string | null {
   const it = ITEMS[item];
+  if (it.mod === "natacao") return "ombro";
   if (it.kind === "cardio" || it.slot === "D") return "joelho";
   if (it.kind === "forca") return "cotovelo";
   return null;

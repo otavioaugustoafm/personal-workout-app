@@ -1,6 +1,7 @@
 // Tipos, catálogo de treinos e utilidades de data/formatação.
+import type { EstadoGarmin } from "./garmin";
 
-export type ItemId = "A" | "B" | "C" | "D" | "RQ" | "RL" | "LG" | "BK" | "BI" | "OFF";
+export type ItemId = "A" | "B" | "C" | "D" | "RQ" | "RL" | "LG" | "BK" | "BI" | "BR" | "NT" | "OFF";
 export type FichaId = "A" | "B" | "C" | "D";
 export type Kind = "forca" | "cardio" | "descanso";
 export type Nivel = "ok" | "leve" | "dor";
@@ -82,14 +83,17 @@ export interface Estado {
   fichas: Record<FichaId, Exercicio[]>;
   sessoes: Sessao[];
   rascunhos: Partial<Record<ItemId, Rascunho>>;
+  garmin?: EstadoGarmin;
 }
+
+export type Modalidade = "corrida" | "bike" | "bikerua" | "natacao";
 
 export interface ItemInfo {
   kind: Kind;
   nome: string;
   curto: string;
   slot: string | null;
-  mod?: "corrida" | "bike";
+  mod?: Modalidade;
   c: string;
   det?: string;
 }
@@ -104,6 +108,8 @@ export const ITEMS: Record<ItemId, ItemInfo> = {
   LG: { kind: "cardio", nome: "Longão", curto: "Longão", slot: "LONG", mod: "corrida", c: "var(--c-run)", det: "Corrida longa em ritmo confortável" },
   BK: { kind: "cardio", nome: "Bike indoor", curto: "Bike", slot: "BIKE", mod: "bike", c: "var(--c-bike)", det: "Zona 2, 60 a 75 min. Véspera do longão: sem intervalado" },
   BI: { kind: "cardio", nome: "Bike intervalada", curto: "Bike", slot: "BIKE", mod: "bike", c: "var(--c-bike)", det: "Cerca de 45 min: 6 a 8 tiros de 2 min forte com 2 min leve" },
+  BR: { kind: "cardio", nome: "Bike de rua", curto: "Bike rua", slot: "BIKE", mod: "bikerua", c: "var(--c-bike)", det: "Pedal na rua: conta como o treino de bike da semana" },
+  NT: { kind: "cardio", nome: "Natação", curto: "Natação", slot: "SWIM", mod: "natacao", c: "var(--c-swim)", det: "Sem impacto. Evite a pernada de peito no dia seguinte à perna" },
   OFF: { kind: "descanso", nome: "Descanso", curto: "Descanso", slot: null, c: "var(--c-off)", det: "Folga ou só mobilidade" },
 };
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
@@ -165,6 +171,21 @@ export function fmtPace(secPerKm: number): string {
   if (!secPerKm || !isFinite(secPerKm)) return "—";
   const m = Math.floor(secPerKm / 60), x = Math.round(secPerKm % 60);
   return x === 60 ? `${m + 1}:00` : `${m}:${String(x).padStart(2, "0")}`;
+}
+/** Modalidades de cardio: nome, unidade de distância e como mostrar o ritmo. */
+export const MODALIDADES: { id: Modalidade; nome: string }[] = [
+  { id: "corrida", nome: "Corrida" }, { id: "bike", nome: "Bike indoor" }, { id: "bikerua", nome: "Bike de rua" }, { id: "natacao", nome: "Natação" },
+];
+export const emMetros = (mod?: Modalidade) => mod === "natacao";
+/** Distância guardada sempre em km; natação aparece em metros. */
+export const fmtDist = (km: number, mod?: Modalidade) =>
+  emMetros(mod) ? `${Math.round(km * 1000).toLocaleString("pt-BR")} m` : `${fmtKm(km)} km`;
+/** Pace da corrida (/km), da natação (/100 m) ou velocidade da bike (km/h). */
+export function fmtRitmo(km: number, seg: number, mod?: Modalidade): string {
+  if (!km || !seg) return "—";
+  if (mod === "corrida") return `${fmtPace(seg / km)} /km`;
+  if (mod === "natacao") return `${fmtPace(seg / (km * 10))} /100 m`;
+  return `${fmtVel(km, seg)} km/h`;
 }
 export const fmtVel = (dist: number, dur: number) => (dist / (dur / 3600)).toFixed(1).replace(".", ",");
 export const uid = () => "x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

@@ -6,7 +6,7 @@
 // - O fim de semana nunca atrapalha a segunda e a terça seguintes (que voltam ao padrão).
 import { addDays, DIAS, dow, isoToday, ITEMS, mondayOf, slotOf, type Estado, type ItemId, type Sessao } from "./dominio";
 
-const VALUE: Record<string, number> = { D: 100, A: 80, B: 80, LONG: 70, RUN: 30, BIKE: 25, C: 20 };
+const VALUE: Record<string, number> = { D: 100, A: 80, B: 80, LONG: 70, RUN: 30, BIKE: 25, SWIM: 25, C: 20 };
 const RECUPERA = new Set(["D", "A", "B", "LONG"]);
 
 export function mainItem(list: Sessao[]): ItemId | null {
@@ -20,7 +20,10 @@ function stepPen(x: ItemId | null, y: ItemId | null): number {
   if (!x || !y || x === "OFF" || y === "OFF") return 0;
   const a = ITEMS[x], b = ITEMS[y], sx = a.slot, sy = b.slot;
   let p = 0;
-  if (sx === "D" && b.kind === "cardio") return -1000; // nada de cardio no dia seguinte à perna
+  if (sx === "D" && b.kind === "cardio") {
+    if (b.mod !== "natacao") return -1000; // nada de corrida ou bike no dia seguinte à perna
+    p -= 5; // natação pode, mas sem pernada de peito
+  }
   if (sx === sy) p -= 30; // mesmo grupo em dias seguidos
   if (a.kind === "cardio" && sy === "D") p -= sx === "LONG" ? 15 : 8; // perna com as pernas cansadas
   if (a.mod === "corrida" && b.mod === "corrida") p -= 40; // duas corridas seguidas: impacto no joelho
@@ -116,8 +119,9 @@ export function weekInfo(S: Estado, today = isoToday()): Semana {
   const seq = dates.map((_, i) => (byDay[i].length ? byDay[i].map((s) => s.item) : rec[i] ? [rec[i]!] : []));
   const alerts = dates.map((_, i) => {
     const prev = i > 0 ? seq[i - 1] : S.sessoes.filter((s) => s.data === addDays(mon, -1)).map((s) => s.item);
-    if (prev.some((x) => slotOf(x) === "D") && seq[i].some((x) => ITEMS[x].kind === "cardio")) return "Cardio no dia seguinte à perna";
-    if (seq[i].some((x) => slotOf(x) === "D") && seq[i].some((x) => ITEMS[x].kind === "cardio")) return "Cardio no mesmo dia da perna";
+    const impacto = (x: ItemId) => ITEMS[x].kind === "cardio" && ITEMS[x].mod !== "natacao";
+    if (prev.some((x) => slotOf(x) === "D") && seq[i].some(impacto)) return "Corrida ou bike no dia seguinte à perna";
+    if (seq[i].some((x) => slotOf(x) === "D") && seq[i].some(impacto)) return "Corrida ou bike no mesmo dia da perna";
     return "";
   });
   return { dates, ti, byDay, rec, r0, deviated, dropped, padrao, alerts, pre };
@@ -159,7 +163,7 @@ export function fichaDoDia(S: Estado): { k: ItemId; hoje: boolean; dia: string }
 function pairPen(x: ItemId, y: ItemId): number {
   if (!x || !y || x === "OFF" || y === "OFF") return 0;
   const a = ITEMS[x], b = ITEMS[y];
-  return a.slot === "D" && b.kind === "cardio" ? -1000 : 0;
+  return a.slot === "D" && b.kind === "cardio" && b.mod !== "natacao" ? -1000 : 0;
 }
 
 export function checkPadrao(p: ItemId[]): { lvl: "bad" | "warn" | "info"; txt: string }[] {
