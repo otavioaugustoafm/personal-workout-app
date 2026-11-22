@@ -1,5 +1,6 @@
 // Tipos, catálogo de treinos e utilidades de data/formatação.
 import type { EstadoGarmin } from "./garmin";
+import type { DiaSaude, EstadoIA } from "./saude";
 
 export type ItemId = "A" | "B" | "C" | "D" | "RQ" | "RL" | "LG" | "BK" | "BI" | "BR" | "NT" | "OFF";
 export type FichaId = "A" | "B" | "C" | "D";
@@ -84,6 +85,9 @@ export interface Estado {
   sessoes: Sessao[];
   rascunhos: Partial<Record<ItemId, Rascunho>>;
   garmin?: EstadoGarmin;
+  saude?: DiaSaude[];
+  ia?: EstadoIA;
+  contexto_ia?: string;
 }
 
 export type Modalidade = "corrida" | "bike" | "bikerua" | "natacao";

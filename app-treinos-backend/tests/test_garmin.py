@@ -65,6 +65,15 @@ class GarminFalso:
     def download_activity(self, aid):
         return fit_de_musculacao()
 
+    def get_daily_sleep(self, d):
+        return {}
+
+    def get_daily_hrv(self, d):
+        return {}
+
+    def get_daily_summaries(self, a, b):
+        return {"data": []}
+
 
 def test_montar_exercicios():
     from src.garmin import ler_fit, montar_exercicios
@@ -78,7 +87,8 @@ def test_montar_exercicios():
 
 def test_sincronizar_e_confirmar(cliente):
     from src.garmin import sincronizar
-    assert sincronizar(3, cliente=GarminFalso()) == {"novas": 2, "vistas": 2}             # caminhada ignorada
+    r = sincronizar(3, cliente=GarminFalso())
+    assert (r["novas"], r["vistas"]) == (2, 2)                                             # caminhada ignorada
     assert sincronizar(3, cliente=GarminFalso())["novas"] == 0                             # não duplica
     e = cliente.get("/api/v1/estado").json()["garmin"]
     forca = next(a for a in e["atividades"] if a["tipo"] == "strength_training")

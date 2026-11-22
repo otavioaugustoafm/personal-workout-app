@@ -15,7 +15,7 @@ Uso pessoal, usuário único. **Separado do app financeiro** (outro repositório
 - [x] **Fase 1** — app completo com login por senha única, banco, importação do backup da página antiga e deploy
 - [x] **Fase 1.1** — bike de rua e natação, gráficos de distância (treino, semana, mês, ano)
 - [x] **Fase 2** — sincronização com o Garmin (passo a passo no fim do [GUIA_DE_DEPLOY.md](GUIA_DE_DEPLOY.md)): cardio e séries do relógio, com confirmação
-- [ ] **Fase 3** — sono, HRV e Body Battery ao lado dos treinos
+- [x] **Fase 3** — sono, HRV, Body Battery, prontidão do dia e análises com IA (seção Fase 3 do guia)
 
 ## Colocando no ar
 

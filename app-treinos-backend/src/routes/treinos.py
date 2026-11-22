@@ -21,7 +21,7 @@ def estado():
 
 @router.put("/configuracao", status_code=status.HTTP_204_NO_CONTENT)
 def configuracao(payload: ConfiguracaoPayload):
-    repo.atualizar_configuracao(payload.semana_padrao, payload.inicio, payload.respondidos)
+    repo.atualizar_configuracao(payload.semana_padrao, payload.inicio, payload.respondidos, payload.contexto_ia)
 
 
 @router.put("/fichas/{ficha_id}", status_code=status.HTTP_204_NO_CONTENT)

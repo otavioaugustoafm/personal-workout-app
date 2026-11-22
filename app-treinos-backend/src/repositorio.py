@@ -29,7 +29,7 @@ def sessao_para_api(r: dict) -> dict:
 
 def ler_estado() -> dict:
     with get_db_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("SELECT semana_padrao, inicio, respondidos FROM configuracao WHERE id = 1")
+        cur.execute("SELECT semana_padrao, inicio, respondidos, contexto_ia FROM configuracao WHERE id = 1")
         cfg = cur.fetchone()
         if cfg is None:
             raise RuntimeError("Tabela configuracao vazia: rode a migracao 001 no Neon.")
@@ -40,14 +40,15 @@ def ler_estado() -> dict:
         cur.execute("SELECT item, dados FROM rascunhos")
         rascunhos = {r["item"]: r["dados"] for r in cur.fetchall()}
         garmin = ler_garmin(cur)
+    from src import ia, saude
     return {
-        "garmin": garmin,
+        "garmin": garmin, "saude": saude.ler_saude(), "ia": ia.ler_ia(), "contexto_ia": cfg.get("contexto_ia") or "",
         "padrao": cfg["semana_padrao"], "inicio": cfg["inicio"].isoformat(), "respondidos": cfg["respondidos"] or {},
         "fichas": fichas, "sessoes": sessoes, "rascunhos": rascunhos,
     }
 
 
-def atualizar_configuracao(semana_padrao=None, inicio=None, respondidos=None) -> None:
+def atualizar_configuracao(semana_padrao=None, inicio=None, respondidos=None, contexto_ia=None) -> None:
     partes, valores = [], []
     if semana_padrao is not None:
         partes.append("semana_padrao = %s"); valores.append(Jsonb(semana_padrao))
@@ -55,6 +56,8 @@ def atualizar_configuracao(semana_padrao=None, inicio=None, respondidos=None) ->
         partes.append("inicio = %s"); valores.append(inicio)
     if respondidos is not None:
         partes.append("respondidos = %s"); valores.append(Jsonb(respondidos))
+    if contexto_ia is not None:
+        partes.append("contexto_ia = %s"); valores.append(contexto_ia.strip())
     if not partes:
         return
     with get_db_connection() as conn:

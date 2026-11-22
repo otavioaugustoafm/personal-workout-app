@@ -25,7 +25,7 @@ def banco():
         pytest.skip("Defina TEST_DATABASE_URL para rodar os testes de banco.")
     import psycopg
     with psycopg.connect(url, autocommit=True) as conn:
-        conn.execute("DROP TABLE IF EXISTS sessoes, rascunhos, fichas, configuracao, garmin_atividades, garmin_estado CASCADE")
+        conn.execute("DROP TABLE IF EXISTS sessoes, rascunhos, fichas, configuracao, garmin_atividades, garmin_estado, saude_diaria, analises_ia CASCADE")
         for arq in MIGRACOES:
             conn.execute(arq.read_text(encoding="utf-8"))
     yield url

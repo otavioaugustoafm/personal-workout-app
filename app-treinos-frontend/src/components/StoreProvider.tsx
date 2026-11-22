@@ -2,7 +2,8 @@
 // (fichas e rascunhos esperam você parar de digitar para não mandar uma requisição por tecla).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { mensagemDeErro, rotas } from "../lib/api";
-import type { Estado } from "../lib/dominio";
+import type { Estado, Sessao } from "../lib/dominio";
+import type { Analise } from "../lib/saude";
 import { StoreCtx, type Store } from "../lib/storeContext";
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -59,6 +60,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const tirarDaFila = (id: string) => (s: Estado | null) =>
     s && { ...s, garmin: s.garmin && { ...s.garmin, atividades: s.garmin.atividades.filter((a) => a.id !== id) } };
 
+  const guardarAnalise = (a: Analise & { gasto_mes?: number }) => setS((s) => s && s.ia ? {
+    ...s, ia: { ...s.ia, gasto_mes: a.gasto_mes ?? s.ia.gasto_mes, analises: [...s.ia.analises.filter((x) => !(x.tipo === a.tipo && x.chave === a.chave)), a] },
+  } : s);
+  const analisar: Store["analisar"] = async (tipo, chave, op = {}) => {
+    try {
+      const a = await rotas.analisar(tipo, chave, !!op.forcar, !!op.auto);
+      guardarAnalise(a);
+      return a;
+    } catch (e) {
+      if (!op.auto) aviso(mensagemDeErro(e, "Não foi possível gerar a análise."), true);
+      return null;
+    }
+  };
+  // treino salvo com dados de verdade: a IA analisa sozinha (Sonnet), dentro do teto automático
+  const analisarTreinoSalvo = (s: Sessao) => {
+    const temDados = s.kind === "forca" ? (s.exercicios || []).some((e) => e.series?.length && !e.pulado && !e.semNota) : !!(s.cardio?.dist || s.cardio?.dur_s);
+    if (!s.rapido && temDados && S.ia?.configurada) analisar("treino", s.id, { auto: true });
+  };
+
   const store: Store = {
     S,
     aviso,
@@ -89,6 +109,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const salva = await rotas.criarSessao(sessao);
         setS((s) => s && { ...s, sessoes: [...s.sessoes.filter((x) => x.id !== salva.id), salva] });
+        analisarTreinoSalvo(salva);
         return true;
       } catch (e) {
         falhou(e);
@@ -114,6 +135,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       try {
         const salva = await rotas.usarGarmin(atividadeId, sessao);
         setS((s) => tirarDaFila(atividadeId)(s && { ...s, sessoes: [...s.sessoes.filter((x) => x.id !== salva.id), salva] }));
+        analisarTreinoSalvo(salva);
         return true;
       } catch (e) {
         falhou(e);
@@ -126,13 +148,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setS(tirarDaFila(atividadeId));
       } catch (e) { falhou(e); }
     },
-    sincronizarGarmin: async () => {
+    analisar,
+    salvarContexto: async (texto) => {
+      try {
+        await rotas.configuracao({ contexto_ia: texto });
+        setS((s) => s && { ...s, contexto_ia: texto });
+        return true;
+      } catch (e) {
+        falhou(e);
+        return false;
+      }
+    },
+    sincronizarGarmin: async (silencioso = false) => {
       try {
         const r = await rotas.sincronizarGarmin();
         await recarregar();
-        aviso(r.novas ? `${r.novas} atividade${r.novas > 1 ? "s" : ""} nova${r.novas > 1 ? "s" : ""} do Garmin` : "Nada novo no Garmin");
+        if (!silencioso) aviso(r.novas ? `${r.novas} atividade${r.novas > 1 ? "s" : ""} nova${r.novas > 1 ? "s" : ""} do Garmin` : "Nada novo no Garmin");
       } catch (e) {
-        aviso(mensagemDeErro(e, "Não foi possível sincronizar com o Garmin."), true);
+        if (!silencioso) aviso(mensagemDeErro(e, "Não foi possível sincronizar com o Garmin."), true);
         recarregar();
       }
     },

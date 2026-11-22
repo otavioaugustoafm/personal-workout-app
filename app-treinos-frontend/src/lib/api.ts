@@ -42,10 +42,11 @@ export function mensagemDeErro(erro: unknown, padrao = "Não foi possível salva
 
 // ---------- rotas do app de treinos ----------
 import type { Estado, Exercicio, FichaId, ItemId, Rascunho, Sessao } from "./dominio";
+import type { Analise, TipoIA } from "./saude";
 
 export const rotas = {
   estado: () => api.get<Estado>("/api/v1/estado").then((r) => r.data),
-  configuracao: (dados: { semana_padrao?: ItemId[]; inicio?: string; respondidos?: Record<string, "nao"> }) =>
+  configuracao: (dados: { semana_padrao?: ItemId[]; inicio?: string; respondidos?: Record<string, "nao">; contexto_ia?: string }) =>
     api.put("/api/v1/configuracao", dados),
   ficha: (id: FichaId, exercicios: Exercicio[]) => api.put(`/api/v1/fichas/${id}`, { exercicios }),
   criarSessao: (s: Sessao) => api.post<Sessao>("/api/v1/sessoes", s).then((r) => r.data),
@@ -57,5 +58,7 @@ export const rotas = {
   usarGarmin: (id: string, sessao: Sessao) => api.post<Sessao>(`/api/v1/garmin/${id}/usar`, { sessao }).then((r) => r.data),
   ignorarGarmin: (id: string) => api.post(`/api/v1/garmin/${id}/ignorar`),
   sincronizarGarmin: () => api.post<{ novas: number }>("/api/v1/garmin/sincronizar", null, { timeout: 70000 }).then((r) => r.data),
+  analisar: (tipo: TipoIA, chave: string, forcar = false, auto = false) =>
+    api.post<Analise & { gasto_mes: number }>(`/api/v1/ia/${tipo}`, { chave, forcar, auto }, { timeout: 70000 }).then((r) => r.data),
   importar: (backup: unknown) => api.post<{ sessoes: number }>("/api/v1/backup/importar", backup).then((r) => r.data),
 };

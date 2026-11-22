@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 from src.config import ALLOWED_ORIGINS, validar_config_api
-from src.routes import auth, garmin, treinos
+from src.routes import auth, garmin, ia, treinos
 
 validar_config_api()
 
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(treinos.router)
 app.include_router(garmin.router)
+app.include_router(ia.router)
 
 
 @app.get("/")

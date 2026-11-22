@@ -1,32 +1,14 @@
-// Lista de insights (calculados no app) e a tela detalhada de um treino do histórico.
+// A tela detalhada de um treino do histórico (com a noite anterior e a análise da IA).
 import {
   DORES, fmtDateLong, fmtDist, fmtDur, fmtInt, fmtKg, fmtRitmo, ITEMS, NIVEL, SENSACAO,
   type Modalidade, type Sessao,
 } from "../lib/dominio";
 import type { ExtraGarmin } from "../lib/garmin";
-import { comparaExercicio, insightsDoTreino, type Insight } from "../lib/insights";
+import { comparaExercicio } from "../lib/insights";
+import { fmtHoras } from "../lib/saude";
+import { AnaliseIA } from "./IA";
 import { useStore } from "../lib/storeContext";
 import { kindLabel, volume } from "../lib/treino";
-
-const ROTULO = { bom: "positivo", atencao: "atenção", info: "observação" } as const;
-
-export function Insights({ itens, titulo = "Insights" }: { itens: Insight[]; titulo?: string }) {
-  if (!itens.length) return null;
-  return (
-    <section className="insights" aria-label={titulo}>
-      <h3>{titulo}</h3>
-      <div className="ins-grid">
-        {itens.map((x, i) => (
-          <div key={i} className={"ins " + x.tom}>
-            <span className="tag">{ROTULO[x.tom]}</span>
-            <b>{x.titulo}</b>
-            <span>{x.texto}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function Dado({ v, l }: { v: string; l: string }) {
   return <div className="dado"><b>{v}</b><span>{l}</span></div>;
@@ -48,7 +30,7 @@ export function DetalheTreino({ s }: { s: Sessao }) {
     [g.elevacao_m ? `${Math.round(g.elevacao_m)} m` : "", "subida"],
   ] as [string, string][]).filter(([v]) => v) : [];
   const dores = Object.entries(s.dores || {}).filter(([, v]) => v);
-  const ins = insightsDoTreino(S, s);
+  const noite = S.saude?.find((d) => d.data === s.data);
   return (
     <div className="detalhe">
       {s.kind === "cardio" && s.cardio && (
@@ -107,7 +89,19 @@ export function DetalheTreino({ s }: { s: Sessao }) {
           {s.notas && <span className="sub">“{s.notas}”</span>}
         </div>
       )}
-      <Insights itens={ins} titulo="Neste treino" />
+      {noite && (noite.sono || noite.hrv || noite.resumo) && (
+        <div>
+          <h4>A noite antes</h4>
+          <div className="dados">
+            {noite.prontidao && <Dado v={String(noite.prontidao.nota)} l="prontidão" />}
+            {noite.sono && <Dado v={fmtHoras(noite.sono.seg)} l={noite.sono.nota != null ? `sono · nota ${noite.sono.nota}` : "sono"} />}
+            {noite.hrv && <Dado v={`${noite.hrv.noite} ms`} l={noite.hrv.faixa_min ? `HRV · faixa ${noite.hrv.faixa_min}–${noite.hrv.faixa_max}` : "HRV"} />}
+            {noite.resumo?.bb_max != null && <Dado v={String(noite.resumo.bb_max)} l="Body Battery máx." />}
+            {noite.resumo?.fc_repouso != null && <Dado v={`${noite.resumo.fc_repouso} bpm`} l="FC de repouso" />}
+          </div>
+        </div>
+      )}
+      {!s.rapido && <AnaliseIA tipo="treino" chave={s.id} titulo="Análise deste treino" vazio="Os treinos novos são analisados sozinhos ao salvar. Para este, toque em Gerar análise (Sonnet 5.5, ~US$ 0,02)." />}
       <span className="sub">Registrado em {fmtDateLong(s.data)}{g ? " · com dados do Garmin" : ""}.</span>
     </div>
   );

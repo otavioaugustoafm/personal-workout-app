@@ -19,6 +19,7 @@ class ConfiguracaoPayload(BaseModel):
     semana_padrao: list[Item] | None = Field(None, min_length=7, max_length=7)
     inicio: date | None = None
     respondidos: dict[str, Literal["nao"]] | None = None
+    contexto_ia: str | None = Field(None, max_length=3000)
 
     @field_validator("respondidos")
     @classmethod

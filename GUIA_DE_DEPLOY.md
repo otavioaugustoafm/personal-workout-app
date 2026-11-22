@@ -339,3 +339,66 @@ confirmação. Toque em **Revisar**, confira e **Confirmar e salvar**.
 | "A sincronização com o Garmin falhou: ... AccessDenied" | falta a política do F2.5 | F2.5 |
 | "A última sincronização falhou: ... 401" | chave errada ou expirada | troque `GARMIN_PERSONAL_API_KEY` |
 | Treino de musculação não aparece logo após terminar | o .FIT ainda não estava pronto | aparece na próxima hora (ou "Sincronizar agora") |
+
+## Fase 3: sono, recuperação, prontidão e análises com IA
+
+O que entra: a Lambda de sincronização passa a trazer **sono, HRV, Body Battery, FC de repouso e estresse**; o app calcula
+a **prontidão do dia** (nota 0–100, sem IA) e a **IA** (API do Claude) escreve as análises: prontidão de manhã (Haiku 5.5),
+cada treino salvo e a revisão da semana (Sonnet 5.5), e as análises sob demanda de Musculação, Cardio e Sono (Sonnet 5.5).
+
+Custo previsto: **~US$ 1,40/mês**. O app para as análises automáticas em **US$ 1,80** no mês e as que você pede em **US$ 2,00**.
+A trava final é o limite de gasto no console da Anthropic (passo F3.3). Não precisa de agendamento novo: a prontidão é
+gerada quando você abre o app e o sono do dia já chegou; a revisão da semana, quando você abre Histórico → Semana.
+
+### F3.1 Banco
+
+No SQL Editor do Neon, rode `migrations/004_saude_e_ia.sql` (só cria tabelas e uma coluna nova).
+
+### F3.2 As duas Lambdas
+
+1. `py scripts\montar_zip_lambda.py`.
+2. Suba o `lambda.zip` novo na **`treinos-api`** e na **`treino-sync`** (Code → Upload from → .zip file). Confira os handlers:
+   `src.main.handler` e `src.garmin.handler`.
+3. Na `treino-sync`: Configuration → General configuration → **Timeout 2 min** (a primeira carga busca 30 dias de sono).
+4. Na `treino-sync`, aba **Test** → rode o evento `primeira-carga` (`{"dias": 30}`). O resultado agora mostra também
+   `"dias_saude": 31`.
+
+### F3.3 Conta de API da Anthropic
+
+1. Entre no console da Anthropic (platform.claude.com) com a sua conta. A API é cobrada à parte da assinatura do Claude.ai.
+2. **Billing**: coloque créditos (US$ 5 duram uns 3 meses no uso previsto).
+3. **Limits**: defina o limite de gasto mensal em **US$ 2**.
+4. **API keys → Create key**, nome `app-treinos`. Copie a chave (ela só aparece uma vez). Não cole no chat nem no GitHub.
+
+### F3.4 Chave na `treinos-api`
+
+Na `treinos-api` → Configuration → Environment variables → Edit → adicione:
+
+| Variável | Valor |
+|---|---|
+| `ANTHROPIC_API_KEY` | a chave do passo F3.3 |
+
+Opcionais (só se quiser mudar o padrão):
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `IA_MODELO` | `claude-sonnet-5-5` | treino, semana e análises sob demanda (ex.: `claude-opus-5-5` para mais profundidade) |
+| `IA_MODELO_RAPIDO` | `claude-haiku-5-5` | prontidão do dia |
+| `IA_LIMITE_AUTO_USD` | `1.80` | teto do mês para as análises automáticas |
+| `IA_LIMITE_USD` | `2.00` | teto do mês para as que você pede |
+
+A chave do Garmin continua só na `treino-sync`; a da Anthropic só na `treinos-api`.
+
+### F3.5 Front-end e primeiro uso
+
+1. Publique o `app-treinos.zip` no GitHub (o Amplify atualiza sozinho).
+2. No app, **Plano → O que a IA sabe sobre você**: escreva suas metas e provas. Vai junto em todas as análises.
+3. Em **Hoje** aparece a prontidão; em **Histórico → Sono**, os gráficos; em cada treino aberto, a análise.
+
+| Sintoma | Causa provável | Onde mexer |
+|---|---|---|
+| "A IA ainda não está ligada" | falta `ANTHROPIC_API_KEY` | F3.4 |
+| "API do Claude respondeu 401" | chave errada ou apagada | F3.3 e F3.4 |
+| "API do Claude respondeu 400 ... credit balance" | sem créditos | F3.3 |
+| "Teto do mês atingido" | chegou em US$ 1,80 (automáticas) ou 2,00 | espere o mês virar ou suba `IA_LIMITE_*` |
+| Prontidão "nota parcial" | o relógio ainda não mandou o sono/HRV do dia | sincronize o relógio com o celular e toque em Sincronizar |

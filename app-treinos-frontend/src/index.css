@@ -354,3 +354,23 @@ table.data.det-tab td{white-space:normal}
 .sc{display:inline-flex;align-items:baseline;gap:5px;padding:3px 8px;border-radius:8px;border:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
 .sc small{color:var(--muted);font-size:10.5px}
 .sc.F,.sc.A{opacity:.7}
+
+/* ---------- IA e prontidão ---------- */
+.card.ia{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+.ia-selo{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.04em}
+.ia-texto{display:flex;flex-direction:column;gap:8px;font-size:14.5px;line-height:1.55;max-width:80ch}
+.ia-texto p{margin:0}
+.ia-texto ul{margin:0;padding-left:20px;list-style:disc;display:flex;flex-direction:column;gap:5px}
+.ia-meta{font-size:12px}
+.prontidao{margin-bottom:16px}
+.pr-card{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px}
+.anel{width:96px;height:96px;flex:none}
+.anel-n{font-family:var(--display);font-size:24px;font-weight:600;fill:var(--ink)}
+.pr-info{display:flex;flex-direction:column;gap:3px;min-width:200px;flex:1}
+.pr-info .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.pr-info b{font-size:19px;font-family:var(--display)}
+.pr-partes{display:flex;flex-direction:column;gap:7px;flex:2;min-width:280px}
+.pr-parte{display:grid;grid-template-columns:110px 90px 1fr;align-items:center;gap:10px;font-size:13px}
+.pr-parte .barra{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.pr-parte .barra span{display:block;height:100%;border-radius:99px}
+@media (max-width:560px){.pr-parte{grid-template-columns:100px 1fr}.pr-parte .sub{grid-column:1/-1;margin-top:-4px}}

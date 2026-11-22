@@ -13,6 +13,7 @@ export default function Plano() {
   const avisos = checkPadrao(S.padrao);
   return (
     <>
+      {S.contexto_ia !== undefined && <ContextoIA />}
       <div className="section" style={{ marginTop: 0 }}>
         <h2>Semana padrão</h2>
         <p className="sub" style={{ margin: "0 0 10px" }}>
@@ -198,5 +199,30 @@ function EditorFichas() {
         }, true)}>+ Adicionar exercício</button>
       </div>
     </>
+  );
+}
+
+/** O que a IA sabe sobre você: vai junto em toda análise. */
+function ContextoIA() {
+  const store = useStore();
+  const [texto, setTexto] = useState(store.S.contexto_ia || "");
+  const [salvando, setSalvando] = useState(false);
+  const mudou = texto !== (store.S.contexto_ia || "");
+  return (
+    <details className="card" style={{ marginBottom: 16 }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600 }}>O que a IA sabe sobre você</summary>
+      <p className="sub" style={{ margin: "10px 0" }}>
+        Vai junto em todas as análises. Escreva suas metas e provas, limitações, o que você quer priorizar. Quanto mais concreto, melhores as recomendações.
+      </p>
+      <textarea className="inp" rows={8} style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }} maxLength={3000}
+        aria-label="O que a IA sabe sobre você" value={texto} onChange={(e) => setTexto(e.target.value)} />
+      <div className="row" style={{ marginTop: 8 }}>
+        <span className="sub">{texto.length} / 3000</span><span className="spacer" />
+        <button className="btn small fill" type="button" disabled={!mudou || salvando}
+          onClick={async () => { setSalvando(true); if (await store.salvarContexto(texto)) store.aviso("Salvo: as próximas análises já usam isso"); setSalvando(false); }}>
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+      </div>
+    </details>
   );
 }

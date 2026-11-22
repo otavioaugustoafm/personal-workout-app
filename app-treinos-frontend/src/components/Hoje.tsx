@@ -5,6 +5,7 @@ import { useStore } from "../lib/storeContext";
 import { cardioLine, doresTexto, exValido, volume } from "../lib/treino";
 import { fmtInt } from "../lib/dominio";
 import GarminFila from "./GarminFila";
+import { ProntidaoHoje } from "./IA";
 import Treino from "./Treino";
 
 export function ResumoSessao({ s }: { s: Sessao }) {
@@ -83,6 +84,7 @@ export default function Hoje() {
         </div>
       )}
 
+      <ProntidaoHoje />
       <GarminFila />
 
       <div className="strip" role="group" aria-label="Dias da semana">

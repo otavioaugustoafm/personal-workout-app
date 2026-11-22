@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Estado, Exercicio, FichaId, ItemId, Rascunho, Sessao } from "./dominio";
+import type { Analise, TipoIA } from "./saude";
 
 export interface Store {
   S: Estado;
@@ -13,7 +14,10 @@ export interface Store {
   recarregar: () => Promise<void>;
   usarGarmin: (atividadeId: string, s: Sessao) => Promise<boolean>;
   ignorarGarmin: (atividadeId: string) => Promise<void>;
-  sincronizarGarmin: () => Promise<void>;
+  sincronizarGarmin: (silencioso?: boolean) => Promise<void>;
+  /** Gera (ou devolve a guardada) uma análise da IA. `auto`: pedida pelo app sozinho, respeita o teto automático. */
+  analisar: (tipo: TipoIA, chave: string, opcoes?: { forcar?: boolean; auto?: boolean }) => Promise<Analise | null>;
+  salvarContexto: (texto: string) => Promise<boolean>;
   aviso: (texto: string, erro?: boolean) => void;
 }
 

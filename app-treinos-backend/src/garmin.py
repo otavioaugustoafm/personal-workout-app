@@ -179,7 +179,17 @@ def sincronizar(dias: int = 3, cliente=None) -> dict:
                         (aid, data, tipo, Jsonb(resumo_da_lista(a)), Jsonb(exercicios) if exercicios is not None else None),
                     )
                 novas += 1
-    return {"novas": novas, "vistas": len(atividades)}
+
+        # sono, HRV, Body Battery: os mesmos dias (a primeira carga, com "dias", traz o histórico)
+        # (de hora em hora só ontem e hoje: o sono de dias anteriores não muda mais)
+        from src import saude
+        inicio_saude = inicio if dias > 3 else hoje - timedelta(days=1)
+        dias_saude, erros_saude = saude.coletar(c, inicio_saude, hoje)
+    saude.recalcular_prontidao([inicio_saude + timedelta(days=i) for i in range((hoje - inicio_saude).days + 1)])
+    resultado = {"novas": novas, "vistas": len(atividades), "dias_saude": dias_saude}
+    if erros_saude:
+        resultado["erros_saude"] = erros_saude[:10]
+    return resultado
 
 
 def _registrar(erro: str | None) -> None:

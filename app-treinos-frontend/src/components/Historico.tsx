@@ -1,18 +1,20 @@
 import { useState } from "react";
 import {
-  addDays, dateOf, ddmm, DIAS_C, DORES, emMetros, fmtDateLong, fmtDist, fmtDur, fmtInt, fmtKg, fmtKm, fmtPace, fmtRitmo, isoOf, isoToday, ITEMS, MESES,
+  addDays, dateOf, ddmm, dow, DIAS_C, DORES, emMetros, fmtDateLong, fmtDist, fmtDur, fmtInt, fmtKg, fmtKm, fmtPace, fmtRitmo, isoOf, isoToday, ITEMS, MESES,
   MODALIDADES, mondayOf, SENSACAO, type FichaId, type Modalidade, type Sessao,
 } from "../lib/dominio";
 import { weekInfo } from "../lib/semana";
 import { useStore } from "../lib/storeContext";
 import { cardioLine, doresAtivas, doresTexto, exValido, seriesText, sessoesDesc, temDor, volume } from "../lib/treino";
 import { GraficoBarras, GraficoLinha, type Ponto } from "./Graficos";
-import { DetalheTreino, Insights } from "./Insights";
-import { insightsCardio, insightsGerais, insightsMusculacao, marcasDo } from "../lib/insights";
+import { DetalheTreino } from "./Insights";
+import { AnaliseIA } from "./IA";
+import SonoHist from "./Sono";
+import { marcasDo } from "../lib/insights";
 import { Halter, Pulso } from "./Icones";
 
-type Sub = "resumo" | "mes" | "musculacao" | "cardio" | "treinos";
-const SUBS: [Sub, string][] = [["resumo", "Semana"], ["mes", "Mês"], ["musculacao", "Musculação"], ["cardio", "Cardio"], ["treinos", "Treinos"]];
+type Sub = "resumo" | "mes" | "musculacao" | "cardio" | "treinos" | "sono";
+const SUBS: [Sub, string][] = [["resumo", "Semana"], ["mes", "Mês"], ["musculacao", "Musculação"], ["cardio", "Cardio"], ["sono", "Sono"], ["treinos", "Treinos"]];
 
 /** Vermelho se algo doeu, amarelo se só incomodou. */
 function corDor(s: Sessao): React.CSSProperties | undefined {
@@ -34,6 +36,7 @@ export default function Historico() {
       {sub === "mes" && <Mes />}
       {sub === "musculacao" && <Musculacao />}
       {sub === "cardio" && <CardioHist />}
+      {sub === "sono" && <SonoHist />}
       {sub === "treinos" && <Lista />}
     </>
   );
@@ -95,7 +98,12 @@ function Resumo() {
         </div>
       </div>
     </div>
-    <Insights itens={insightsGerais(S)} titulo="Insights gerais" />
+    <AnaliseIA tipo="semana" chave={w.dates[0]} titulo="Esta semana"
+      auto={dow(isoToday()) === 6 && new Date().getHours() >= 18}
+      vazio="No domingo à noite a revisão sai sozinha. Antes disso, toque em Gerar análise para ver como a semana está indo (Sonnet 5.5, ~US$ 0,07)." />
+    {addDays(w.dates[0], -7) >= S.inicio && S.sessoes.some((s) => s.data >= addDays(w.dates[0], -7) && s.data < w.dates[0]) && (
+      <AnaliseIA tipo="semana" chave={addDays(w.dates[0], -7)} titulo="Semana passada" auto />
+    )}
     </>
   );
 }
@@ -218,7 +226,8 @@ function Musculacao() {
       )}
     </div>
   );
-  const geral = <Insights itens={insightsMusculacao(S)} titulo="Insights de musculação" />;
+  const geral = <AnaliseIA tipo="musculacao" chave={isoToday()} titulo="Musculação nas últimas 8 semanas"
+    vazio="Toque em Gerar análise: progressão, cargas paradas e prioridades por exercício (Sonnet 5.5, ~US$ 0,05)." />;
   if (!hist.length) return <>{geral}{seletor}<div className="empty" style={{ marginTop: 12 }}>Ainda não há registros deste exercício. Eles aparecem aqui depois do primeiro treino salvo.</div></>;
   const melhor = Math.max(...hist.map((h) => h.top)), ult = hist[hist.length - 1], pri = hist[0];
   const tabela = (repsModo: boolean) => (
@@ -347,7 +356,8 @@ function CardioHist() {
   return (
     <>
       {seg}
-      <Insights itens={insightsCardio(S, mod)} titulo="Insights de cardio" />
+      <AnaliseIA tipo="cardio" chave={isoToday()} titulo="Cardio nas últimas 12 semanas"
+        vazio="Toque em Gerar análise: volume, ritmo, eficiência, longão, joelho e sono (Sonnet 5.5, ~US$ 0,05)." />
       <div className="tiles">
         <div className="tile"><div className="v">{doMes.length}</div><div className="l">treinos neste mês</div></div>
         <div className="tile"><div className="v">{big(soma(doMes, "dist"))}</div><div className="l">no mês</div></div>
