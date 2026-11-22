@@ -98,6 +98,28 @@ def montar_exercicios(mensagens: dict, passos_api: list | None = None) -> list[d
     return grupos
 
 
+def voltas_do_fit(mensagens: dict) -> list[dict]:
+    """Parciais (voltas) de uma atividade de cardio: normalmente 1 km cada, ou o que o treino/botão de volta marcou."""
+    out = []
+    for v in mensagens.get("lap_mesgs") or []:
+        dist, seg = v.get("total_distance"), v.get("total_timer_time") or v.get("total_elapsed_time")
+        if not seg:
+            continue
+        cad = v.get("avg_cadence")
+        if cad and str(primeiro(v.get("sport"))).lower() == "running":   # no FIT a corrida vem em passadas por perna
+            cad = (cad + (v.get("avg_fractional_cadence") or 0)) * 2
+        out.append({
+            "dist_m": round(dist) if isinstance(dist, (int, float)) else None,
+            "seg": round(seg, 1),
+            "fc": round(v["avg_heart_rate"]) if v.get("avg_heart_rate") else None,
+            "fc_max": round(v["max_heart_rate"]) if v.get("max_heart_rate") else None,
+            "cadencia": round(cad) if cad else None,
+            "subida": round(v["total_ascent"]) if v.get("total_ascent") else None,
+            "tipo": str(primeiro(v.get("intensity")) or "active").lower(),
+        })
+    return out
+
+
 def resumo_da_lista(a: dict) -> dict:
     """Só o que o app usa, de um item da lista de atividades."""
     dist = a.get("distance") or 0
@@ -171,14 +193,38 @@ def sincronizar(dias: int = 3, cliente=None) -> dict:
                         passos_api = [passos_api]
                     # se o .FIT ainda não estiver pronto, não grava: tenta de novo na próxima hora
                     exercicios = montar_exercicios(ler_fit(c.download_activity(aid)), passos_api)
+                voltas = None
+                if TIPOS[tipo] != "forca":
+                    try:
+                        voltas = voltas_do_fit(ler_fit(c.download_activity(aid)))
+                    except Exception:  # noqa: BLE001 - sem parciais a atividade entra mesmo assim; tenta de novo depois
+                        voltas = None
                 data = (a.get("startTimeLocal") or hoje.isoformat())[:10]
                 with get_db_connection() as conn:
                     conn.execute(
-                        """INSERT INTO garmin_atividades (id, data, tipo, resumo, exercicios)
-                           VALUES (%s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING""",
-                        (aid, data, tipo, Jsonb(resumo_da_lista(a)), Jsonb(exercicios) if exercicios is not None else None),
+                        """INSERT INTO garmin_atividades (id, data, tipo, resumo, exercicios, voltas)
+                           VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING""",
+                        (aid, data, tipo, Jsonb(resumo_da_lista(a)), Jsonb(exercicios) if exercicios is not None else None,
+                         Jsonb(voltas) if voltas is not None else None),
                     )
                 novas += 1
+            # completa as parciais das atividades de cardio que entraram antes (e das sessões já confirmadas com elas)
+            for a in atividades:
+                aid = int(a["activityId"])
+                if aid not in ja or TIPOS[a["activityType"]["typeKey"]] == "forca":
+                    continue
+                with get_db_connection() as conn:
+                    falta = conn.execute("SELECT 1 FROM garmin_atividades WHERE id = %s AND voltas IS NULL", (aid,)).fetchone()
+                if not falta:
+                    continue
+                try:
+                    voltas = voltas_do_fit(ler_fit(c.download_activity(aid)))
+                except Exception:  # noqa: BLE001
+                    continue
+                with get_db_connection() as conn:
+                    conn.execute("UPDATE garmin_atividades SET voltas = %s WHERE id = %s", (Jsonb(voltas), aid))
+                    conn.execute("""UPDATE sessoes SET garmin = garmin || jsonb_build_object('voltas', %s::jsonb)
+                                    WHERE garmin->>'atividade' = %s""", (Jsonb(voltas), str(aid)))
 
         # sono, HRV, Body Battery: os mesmos dias (a primeira carga, com "dias", traz o histórico)
         # (de hora em hora só ontem e hoje: o sono de dias anteriores não muda mais)

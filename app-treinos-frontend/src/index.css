@@ -374,3 +374,14 @@ table.data.det-tab td{white-space:normal}
 .pr-parte .barra{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
 .pr-parte .barra span{display:block;height:100%;border-radius:99px}
 @media (max-width:560px){.pr-parte{grid-template-columns:100px 1fr}.pr-parte .sub{grid-column:1/-1;margin-top:-4px}}
+
+/* ---------- edição e parciais ---------- */
+.editor{display:flex;flex-direction:column;gap:12px}
+.comofoi{display:flex;flex-direction:column;gap:10px}
+.comofoi textarea{width:100%;resize:vertical;font-family:inherit}
+.gex .gs select.inp.tipo{flex:none;width:112px;min-width:0;padding:6px 26px 6px 8px}
+table.data.parciais td{padding-top:6px;padding-bottom:6px}
+table.data.parciais tr.desc td{opacity:.55}
+.barra-cel{width:30%;min-width:90px}
+.barra-cel span{display:block;height:6px;border-radius:99px;background:var(--chart)}
+.comofoi .seg{align-self:flex-start;width:auto}

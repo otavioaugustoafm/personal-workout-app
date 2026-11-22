@@ -18,6 +18,8 @@ export interface Store {
   /** Gera (ou devolve a guardada) uma análise da IA. `auto`: pedida pelo app sozinho, respeita o teto automático. */
   analisar: (tipo: TipoIA, chave: string, opcoes?: { forcar?: boolean; auto?: boolean }) => Promise<Analise | null>;
   salvarContexto: (texto: string) => Promise<boolean>;
+  /** Edita um treino do histórico; a análise da IA desse treino é refeita. */
+  editarSessao: (s: Sessao) => Promise<boolean>;
   aviso: (texto: string, erro?: boolean) => void;
 }
 

@@ -58,6 +58,7 @@ export const rotas = {
   usarGarmin: (id: string, sessao: Sessao) => api.post<Sessao>(`/api/v1/garmin/${id}/usar`, { sessao }).then((r) => r.data),
   ignorarGarmin: (id: string) => api.post(`/api/v1/garmin/${id}/ignorar`),
   sincronizarGarmin: () => api.post<{ novas: number }>("/api/v1/garmin/sincronizar", null, { timeout: 70000 }).then((r) => r.data),
+  editarSessao: (s: Sessao) => api.put<Sessao>(`/api/v1/sessoes/${s.id}`, s).then((r) => r.data),
   analisar: (tipo: TipoIA, chave: string, forcar = false, auto = false) =>
     api.post<Analise & { gasto_mes: number }>(`/api/v1/ia/${tipo}`, { chave, forcar, auto }, { timeout: 70000 }).then((r) => r.data),
   importar: (backup: unknown) => api.post<{ sessoes: number }>("/api/v1/backup/importar", backup).then((r) => r.data),

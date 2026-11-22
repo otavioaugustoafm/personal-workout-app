@@ -8,6 +8,8 @@ import {
   pendentes, seriesDoGrupo, sessaoCardio, sessaoDoDia, sessaoForca, type Acao, type AtividadeGarmin, type GrupoGarmin, type Linha,
 } from "../lib/garmin";
 import { useStore } from "../lib/storeContext";
+import { comoFoiDe } from "../lib/comoFoi";
+import ComoFoiCampos from "./ComoFoiCampos";
 import { kindLabel, seriesFrom, seriesText } from "../lib/treino";
 
 const diaTxt = (d: string) => `${DIAS_C[dow(d)]} ${ddmm(d)}`;
@@ -104,16 +106,22 @@ function RevisaoForca({ a, fechar }: { a: AtividadeGarmin; fechar: () => void })
   const [item, setItem] = useState<ItemId>(doDia ? doDia.item : fichaProvavel(S, a));
   const existente = sessaoDoDia(S, a.data, item);
   const [linhas, setLinhas] = useState<Linha[]>(() => linhasForca(S, item, a, existente));
+  const [comoFoi, setComoFoi] = useState(() => comoFoiDe(existente));
   const [salvando, setSalvando] = useState(false);
 
-  const trocarFicha = (k: ItemId) => { setItem(k); setLinhas(linhasForca(S, k, a, sessaoDoDia(S, a.data, k))); };
+  const trocarFicha = (k: ItemId) => {
+    setItem(k);
+    const ex = sessaoDoDia(S, a.data, k);
+    setLinhas(linhasForca(S, k, a, ex));
+    setComoFoi(comoFoiDe(ex));
+  };
   const mudar = (i: number, fn: (l: Linha) => Linha) => setLinhas((ls) => ls.map((l, j) => (j === i ? fn(clone(l)) : l)));
   const usados = new Set(linhas.filter((l) => l.acao === "garmin" && l.g != null).map((l) => l.g));
   const soltos = grupos.map((g, i) => ({ g, i })).filter(({ i }) => !linhas.some((l) => l.g === i));
 
   const confirmar = async () => {
     setSalvando(true);
-    const ok = await store.usarGarmin(a.id, sessaoForca(item, a, linhas, existente));
+    const ok = await store.usarGarmin(a.id, { ...sessaoForca(item, a, linhas, existente), ...comoFoi });
     setSalvando(false);
     if (!ok) return;
     const ficha = fichaAprendida(S, item, a, linhas);
@@ -153,6 +161,8 @@ function RevisaoForca({ a, fechar }: { a: AtividadeGarmin; fechar: () => void })
           Do relógio, sem exercício ligado (não entram): {soltos.map(({ g }) => `${g.descricao || g.nome || g.categoria} (${g.series.length} séries)`).join(", ")}.
         </div>
       )}
+      <h3 style={{ margin: "6px 0 0" }}>Como foi</h3>
+      <ComoFoiCampos item={item} valor={comoFoi} mudar={setComoFoi} id={"g" + a.id} />
       <div className="save-row">
         <button className="btn ghost" type="button" onClick={fechar}>Cancelar</button>
         <button className="btn fill" type="button" disabled={salvando} onClick={confirmar}>{salvando ? "Salvando…" : "Confirmar e salvar"}</button>
@@ -277,6 +287,7 @@ function RevisaoCardio({ a, fechar }: { a: AtividadeGarmin; fechar: () => void }
     fc: atual?.fc ?? a.resumo.fc,
   });
   const [campos, setCampos] = useState(inicial);
+  const [comoFoi, setComoFoi] = useState(() => comoFoiDe(existente));
   const [rev, setRev] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const r = a.resumo;
@@ -285,11 +296,12 @@ function RevisaoCardio({ a, fechar }: { a: AtividadeGarmin; fechar: () => void }
     setItem(k);
     const ex = sessaoDoDia(S, a.data, k)?.cardio;
     setCampos({ dist: ex?.dist ?? sugDist, dur: fmtDurEdit(ex?.dur_s ?? r.dur_s), fc: ex?.fc ?? r.fc });
+    setComoFoi(comoFoiDe(sessaoDoDia(S, a.data, k)));
     setRev((x) => x + 1);
   };
   const confirmar = async () => {
     setSalvando(true);
-    const ok = await store.usarGarmin(a.id, sessaoCardio(a, item, { dist: campos.dist, dur_s: parseDur(campos.dur), fc: campos.fc }, existente));
+    const ok = await store.usarGarmin(a.id, { ...sessaoCardio(a, item, { dist: campos.dist, dur_s: parseDur(campos.dur), fc: campos.fc }, existente), ...comoFoi });
     setSalvando(false);
     if (ok) { store.aviso(`${ITEMS[item].nome} de ${ddmm(a.data)} salvo com o Garmin`); fechar(); }
   };
@@ -339,7 +351,9 @@ function RevisaoCardio({ a, fechar }: { a: AtividadeGarmin; fechar: () => void }
           <span className="sub">{nota(atual?.fc, r.fc ? `${r.fc} bpm` : "nada")}</span>
         </div>
       </div>
-      {extras.length > 0 && <span className="sub">Também guardado: {extras.join(" · ")}.</span>}
+      {extras.length > 0 && <span className="sub">Também guardado: {extras.join(" · ")}{a.voltas && a.voltas.length > 1 ? ` · ${a.voltas.length} parciais` : ""}.</span>}
+      <h3 style={{ margin: "6px 0 0" }}>Como foi</h3>
+      <ComoFoiCampos item={item} valor={comoFoi} mudar={setComoFoi} id={"g" + a.id} />
       <div className="save-row">
         <button className="btn ghost" type="button" onClick={fechar}>Cancelar</button>
         <button className="btn fill" type="button" disabled={salvando} onClick={confirmar}>{salvando ? "Salvando…" : "Confirmar e salvar"}</button>

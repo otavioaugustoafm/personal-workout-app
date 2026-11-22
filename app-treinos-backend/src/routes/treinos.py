@@ -39,6 +39,16 @@ def criar_sessao(payload: SessaoPayload):
     return repo.criar_sessao(payload.model_dump(mode="json"))
 
 
+@router.put("/sessoes/{sessao_id}")
+def editar_sessao(sessao_id: str, payload: SessaoPayload):
+    if payload.id != sessao_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="O id do corpo não bate com o da URL.")
+    salva = repo.atualizar_sessao(payload.model_dump(mode="json"))
+    if salva is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Registro nao encontrado.")
+    return salva
+
+
 @router.delete("/sessoes/{sessao_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_sessao(sessao_id: str):
     if not repo.excluir_sessao(sessao_id):

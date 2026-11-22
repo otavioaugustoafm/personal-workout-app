@@ -7,6 +7,8 @@ import type { ExtraGarmin } from "../lib/garmin";
 import { comparaExercicio } from "../lib/insights";
 import { fmtHoras } from "../lib/saude";
 import { AnaliseIA } from "./IA";
+import EditarTreino from "./EditarTreino";
+import { useState } from "react";
 import { useStore } from "../lib/storeContext";
 import { kindLabel, volume } from "../lib/treino";
 
@@ -16,6 +18,7 @@ function Dado({ v, l }: { v: string; l: string }) {
 
 export function DetalheTreino({ s }: { s: Sessao }) {
   const { S } = useStore();
+  const [editando, setEditando] = useState(false);
   const it = ITEMS[s.item];
   const g = (s.garmin || null) as ExtraGarmin | null;
   const mod = it.mod as Modalidade | undefined;
@@ -31,8 +34,16 @@ export function DetalheTreino({ s }: { s: Sessao }) {
   ] as [string, string][]).filter(([v]) => v) : [];
   const dores = Object.entries(s.dores || {}).filter(([, v]) => v);
   const noite = S.saude?.find((d) => d.data === s.data);
+  if (editando) return <div className="detalhe"><EditarTreino s={s} fechar={() => setEditando(false)} /></div>;
+  const voltas = (g?.voltas || []).filter((v) => v.seg);
+  const porKm = mod === "corrida" || mod === "natacao";
+  const vel = (v: { dist_m: number | null; seg: number }) => (v.dist_m ? v.dist_m / v.seg : 0);
+  const velMax = Math.max(0, ...voltas.map(vel));
   return (
     <div className="detalhe">
+      <div className="row" style={{ justifyContent: "flex-end", marginBottom: -6 }}>
+        <button className="btn small" type="button" onClick={() => setEditando(true)}>Editar treino</button>
+      </div>
       {s.kind === "cardio" && s.cardio && (
         <div className="dados">
           {s.cardio.dist ? <Dado v={fmtDist(s.cardio.dist, mod)} l="distância" /> : null}
@@ -75,6 +86,26 @@ export function DetalheTreino({ s }: { s: Sessao }) {
             })}</tbody>
           </table></div>
         </>
+      )}
+      {voltas.length > 1 && (
+        <div>
+          <h4>Parciais</h4>
+          <div className="tbl-wrap"><table className="data parciais">
+            <thead><tr><th>#</th><th>Distância</th><th>Tempo</th><th>{porKm ? "Pace" : "Velocidade"}</th><th aria-hidden="true" /><th>FC</th><th>Cadência</th><th>Subida</th></tr></thead>
+            <tbody>{voltas.map((v, i) => (
+              <tr key={i} className={v.tipo === "rest" || v.tipo === "recovery" ? "desc" : ""}>
+                <td className="mono">{i + 1}</td>
+                <td className="mono">{v.dist_m ? (mod === "natacao" ? `${v.dist_m} m` : `${fmtKg(Math.round(v.dist_m / 10) / 100)} km`) : "—"}</td>
+                <td className="mono">{fmtDur(Math.round(v.seg))}</td>
+                <td className="mono">{v.dist_m ? fmtRitmo(v.dist_m / 1000, v.seg, mod) : "—"}</td>
+                <td className="barra-cel"><span style={{ width: velMax ? `${(vel(v) / velMax) * 100}%` : 0 }} /></td>
+                <td className="mono">{v.fc ? `${v.fc}${v.fc_max ? ` / ${v.fc_max}` : ""}` : "—"}</td>
+                <td className="mono">{v.cadencia ?? "—"}</td>
+                <td className="mono">{v.subida != null ? `${v.subida} m` : "—"}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </div>
       )}
       {garmin.length > 0 && (
         <div>

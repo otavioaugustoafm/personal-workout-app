@@ -110,3 +110,50 @@ def test_sincronizar_e_confirmar(cliente):
     assert cliente.post("/api/v1/garmin/99/ignorar").status_code == 404
     assert [a["id"] for a in cliente.get("/api/v1/estado").json()["garmin"]["atividades"]] == ["12"]
     assert cliente.post("/api/v1/garmin/sincronizar").status_code == 501                   # sem a Lambda configurada
+
+
+def fit_de_corrida() -> bytes:
+    mt = Profile["mesg_num"]
+    enc = Encoder()
+    t0 = dt.datetime(2026, 11, 22, 9, 0, tzinfo=dt.timezone.utc)
+    enc.write_mesg({"mesg_num": mt["FILE_ID"], "type": "activity", "manufacturer": "garmin", "product": 1, "time_created": t0, "serial_number": 1})
+    for i, (seg, fc) in enumerate([(372.0, 148), (380.5, 155), (420.0, 160)]):
+        enc.write_mesg({"mesg_num": mt["LAP"], "timestamp": t0 + dt.timedelta(minutes=7 * (i + 1)), "start_time": t0,
+                        "total_distance": 1000.0 if i < 2 else 900.0, "total_timer_time": seg, "total_elapsed_time": seg,
+                        "avg_heart_rate": fc, "max_heart_rate": fc + 8, "avg_cadence": 82, "sport": "running", "intensity": "active"})
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("2_ACTIVITY.fit", bytes(enc.close()))
+    return buf.getvalue()
+
+
+def test_parciais_e_edicao(cliente):
+    from src.garmin import ler_fit, sincronizar, voltas_do_fit
+    v = voltas_do_fit(ler_fit(fit_de_corrida()))
+    assert [x["dist_m"] for x in v] == [1000, 1000, 900] and v[0]["cadencia"] == 164 and v[1]["fc"] == 155
+
+    class ComCorrida(GarminFalso):
+        def download_activity(self, aid):
+            return fit_de_corrida() if aid == 12 else fit_de_musculacao()
+
+    class SemParciais(GarminFalso):
+        def download_activity(self, aid):
+            if aid == 12:
+                raise RuntimeError("FIT ainda não pronto")
+            return fit_de_musculacao()
+
+    sincronizar(3, cliente=SemParciais())                       # corrida entra sem parciais
+    hoje = dt.date.today().isoformat()
+    s = {"id": "lg1", "data": hoje, "item": "LG", "cardio": {"dist": 2.9, "dur_s": 1308}, "garmin": {"atividade": "12"}}
+    assert cliente.post("/api/v1/garmin/12/usar", json={"sessao": s}).status_code == 200
+    sincronizar(3, cliente=ComCorrida())                        # na próxima, completa a atividade e a sessão já salva
+    e = cliente.get("/api/v1/estado").json()
+    assert len(next(x for x in e["sessoes"] if x["id"] == "lg1")["garmin"]["voltas"]) == 3
+
+    s.update(notas="Parei no km 3: dor de barriga.", dores={"joelho": "leve"}, sensacao="pesado")
+    r = cliente.put("/api/v1/sessoes/lg1", json=s)
+    assert r.status_code == 200 and r.json()["notas"].startswith("Parei") and r.json()["dores"] == {"joelho": "leve"}
+    assert r.json()["garmin"] == {"atividade": "12"}           # a edição manda o que o app tem
+    assert cliente.put("/api/v1/sessoes/outra", json=s).status_code == 400
+    s2 = {**s, "id": "nao-existe"}
+    assert cliente.put("/api/v1/sessoes/nao-existe", json=s2).status_code == 404

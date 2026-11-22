@@ -71,11 +71,17 @@ def test_analises(cliente, monkeypatch):
     assert a["modelo"] == "claude-haiku-5-5" and abs(a["custo_usd"] - (4000 * 0.10 + 500 * 0.50) / 1e6) < 1e-9
     assert "Prontidão de hoje" in pedidos[0][2] and "Protejo o joelho" in pedidos[0][1]
     assert ia.analisar("prontidao", hoje.isoformat())["texto"] == "Texto da análise." and len(pedidos) == 1   # guardada
+    cliente.post("/api/v1/sessoes", json={"id": "r1", "data": hoje.isoformat(), "item": "LG", "notas": "Parei cedo: estava passando mal.",
+                                          "cardio": {"dist": 2.9, "dur_s": 1308}, "garmin": {"atividade": "9", "voltas": [
+                                              {"dist_m": 1000, "seg": 450, "fc": 150}, {"dist_m": 1000, "seg": 470, "fc": 158}]}})
+    ia.analisar("treino", "r1")
+    assert 'nota do atleta: "Parei cedo' in pedidos[-1][2] and "parciais: 7:30/km FC 150 | 7:50/km FC 158" in pedidos[-1][2]
+    assert "As notas do atleta explicam" in pedidos[-1][1]
     t = ia.analisar("treino", "f1")
-    assert t["modelo"] == "claude-haiku-5-5" and "aq 10×20, 30×12" in pedidos[1][2]
+    assert t["modelo"] == "claude-haiku-5-5" and "aq 10×20, 30×12" in pedidos[-1][2]
     ia.analisar("treino", "f1", forcar=True)                                                                  # refazer soma o custo
     assert ia.analisar("musculacao", "x")["modelo"] == "claude-sonnet-5-5"
-    assert ia.gasto_do_mes() == round(3 * ia.custo("claude-haiku-5-5", 4000, 500) + ia.custo("claude-sonnet-5-5", 4000, 500), 6)
+    assert ia.gasto_do_mes() == round(4 * ia.custo("claude-haiku-5-5", 4000, 500) + ia.custo("claude-sonnet-5-5", 4000, 500), 6)
 
     monkeypatch.setattr(ia, "LIMITE_AUTO", 0.01)
     try:
@@ -91,6 +97,6 @@ def test_analises(cliente, monkeypatch):
     assert r.status_code == 200 and r.json()["gasto_mes"] > 0
     assert cliente.post("/api/v1/ia/treino", json={"chave": "nao-existe"}).status_code == 404
     e = cliente.get("/api/v1/estado").json()["ia"]
-    assert len(e["analises"]) == 5 and e["configurada"] is True
+    assert len(e["analises"]) == 6 and e["configurada"] is True
     assert cliente.put("/api/v1/configuracao", json={"contexto_ia": "Meta: meia maratona em abril."}).status_code == 204
     assert cliente.get("/api/v1/estado").json()["contexto_ia"] == "Meta: meia maratona em abril."

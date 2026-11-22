@@ -28,12 +28,14 @@ export interface ResumoGarmin {
   elevacao_m: number | null;
   inicio: string;
 }
+export interface Volta { dist_m: number | null; seg: number; fc: number | null; fc_max: number | null; cadencia: number | null; subida: number | null; tipo: string }
 export interface AtividadeGarmin {
   id: string;
   data: string;
   tipo: string;
   resumo: ResumoGarmin;
   exercicios: GrupoGarmin[] | null;
+  voltas?: Volta[] | null;
 }
 export interface EstadoGarmin {
   atividades: AtividadeGarmin[];
@@ -52,6 +54,7 @@ export interface ExtraGarmin {
   elevacao_m?: number | null;
   dur_s?: number | null;
   fc?: number | null;
+  voltas?: Volta[] | null;
 }
 
 export const MOD_DO_TIPO: Record<string, Modalidade | "forca"> = {
@@ -76,7 +79,7 @@ export const pendentes = (S: Estado) =>
 export const extraDe = (a: AtividadeGarmin): ExtraGarmin => ({
   atividade: a.id, fc_max: a.resumo.fc_max, calorias: a.resumo.calorias, te_aerobico: a.resumo.te_aerobico,
   te_anaerobico: a.resumo.te_anaerobico, cadencia: a.resumo.cadencia, elevacao_m: a.resumo.elevacao_m,
-  dur_s: a.resumo.dur_s, fc: a.resumo.fc,
+  dur_s: a.resumo.dur_s, fc: a.resumo.fc, voltas: a.voltas || null,
 });
 
 export const norm = (s: string | null | undefined) =>

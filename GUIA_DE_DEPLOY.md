@@ -404,3 +404,14 @@ A chave do Garmin continua só na `treino-sync`; a da Anthropic só na `treinos-
 | "API do Claude respondeu 400 ... credit balance" | sem créditos | F3.3 |
 | "Teto do mês atingido" | chegou em US$ 1,80 (automáticas) ou 2,00 | espere o mês virar ou suba `IA_LIMITE_*` |
 | Prontidão "nota parcial" | o relógio ainda não mandou o sono/HRV do dia | sincronize o relógio com o celular e toque em Sincronizar |
+
+## Atualização: parciais, edição de treinos e notas
+
+1. No Neon, rode `migrations/005_parciais.sql` (uma coluna nova).
+2. Suba o `lambda.zip` novo na **`treinos-api`** e na **`treino-sync`** (confira os handlers depois).
+3. Na `treino-sync`, rode de novo o teste `primeira-carga` (`{"dias": 30}`): ele completa as parciais das corridas do último
+   mês, inclusive nas que você já confirmou.
+4. Publique o `app-treinos.zip` no GitHub.
+
+No app: em **Histórico → Treinos → Abrir treino → Editar treino** dá para mudar séries, cargas, distância, tempo, FC, dores,
+sensação e notas. Ao salvar, a análise da IA desse treino é refeita (dentro do teto automático do mês).

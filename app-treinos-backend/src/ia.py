@@ -69,6 +69,8 @@ Regras:
 - Nada genérico ou óbvio ("hidrate-se", "durma bem", "ouça seu corpo"): só diga algo se os dados mostram.
 - Se os dados forem poucos para concluir algo, diga isso numa frase em vez de inventar.
 - Respeite as regras e objetivos do atleta abaixo (ex.: proteger o joelho). Não sugira nada que as contradiga.
+- As notas do atleta explicam o contexto do treino (ex.: por que parou antes, calor, mal-estar, falta de tempo). Leve-as em conta:
+  não trate como queda de condicionamento o que a nota explica, e diga o que fazer a partir disso.
 - Dor que "doeu" é sinal de alerta; "incomodou" é algo a observar. Não faça diagnóstico médico; se uma dor se repete, sugira avaliação.
 - Formato: parágrafos curtos e tópicos com "- ". Pode usar **negrito** em poucas palavras. Sem títulos, sem tabelas, sem emojis.
 
@@ -149,6 +151,7 @@ def linha_sessao(s: dict, detalhe: bool = True) -> str:
     nome = NOMES_ITEM.get(s["item"], s["item"])
     g = s.get("garmin") or {}
     cab = [f"{_dia(s['data'])} · {nome}"]
+    voltas: list = []
     if s["tipo"] == "cardio":
         c = s.get("cardio") or {}
         if c.get("dist"):
@@ -162,6 +165,7 @@ def linha_sessao(s: dict, detalhe: bool = True) -> str:
             cab.append(f"FC {c['fc']}" + (f"/{g['fc_max']}" if g.get("fc_max") else ""))
         if g.get("cadencia"):
             cab.append(f"cadência {g['cadencia']}")
+        voltas = [v for v in (g.get("voltas") or []) if v.get("seg")]
     else:
         if g.get("dur_s"):
             cab.append(f"{round(g['dur_s'] / 60)} min" + (f", FC {g['fc']}" if g.get("fc") else ""))
@@ -181,7 +185,13 @@ def linha_sessao(s: dict, detalhe: bool = True) -> str:
         cab.append("marcado como feito, sem anotação")
     txt = " · ".join(cab)
     if s.get("notas"):
-        txt += f' · nota: "{s["notas"][:160]}"'
+        txt += f' · nota do atleta: "{s["notas"][:600]}"'
+    if detalhe and s["tipo"] == "cardio" and len(voltas) > 1:
+        par = []
+        for v in voltas[:40]:
+            ritmo = (f"{_dur(v['seg'] / (v['dist_m'] / 1000))}/km" if s["item"] in ("RQ", "RL", "LG") else f"{v['dist_m'] / v['seg'] * 3.6:.1f} km/h") if v.get("dist_m") else _dur(v["seg"])
+            par.append(ritmo + (f" FC {v['fc']}" if v.get("fc") else "") + (" (desc.)" if v.get("tipo") in ("rest", "recovery") else ""))
+        txt += "\n    parciais: " + " | ".join(par)
     if detalhe and s["tipo"] == "forca":
         for e in s.get("exercicios") or []:
             st = "pulado" if e.get("pulado") else "sem anotação" if e.get("semNota") or e.get("aConfirmar") else _series(e)

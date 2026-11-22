@@ -149,6 +149,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } catch (e) { falhou(e); }
     },
     analisar,
+    editarSessao: async (sessao) => {
+      try {
+        const salva = await rotas.editarSessao(sessao);
+        setS((s) => s && { ...s, sessoes: s.sessoes.map((x) => (x.id === salva.id ? salva : x)) });
+        const temDados = salva.kind === "forca" ? (salva.exercicios || []).some((e) => e.series?.length && !e.pulado && !e.semNota) : !!(salva.cardio?.dist || salva.cardio?.dur_s);
+        if (temDados && S.ia?.configurada) analisar("treino", salva.id, { forcar: true, auto: true });
+        return true;
+      } catch (e) {
+        falhou(e);
+        return false;
+      }
+    },
     salvarContexto: async (texto) => {
       try {
         await rotas.configuracao({ contexto_ia: texto });

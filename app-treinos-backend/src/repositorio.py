@@ -71,10 +71,10 @@ def salvar_ficha(ficha_id: str, exercicios: list) -> None:
 
 def ler_garmin(cur) -> dict:
     """Atividades do Garmin ainda sem decisão (últimos 60 dias) e a situação da sincronização."""
-    cur.execute("""SELECT id, data, tipo, resumo, exercicios FROM garmin_atividades
+    cur.execute("""SELECT id, data, tipo, resumo, exercicios, voltas FROM garmin_atividades
                    WHERE situacao = 'nova' AND data >= current_date - 60 ORDER BY data, id""")
     atividades = [{"id": str(r["id"]), "data": r["data"].isoformat(), "tipo": r["tipo"], "resumo": r["resumo"],
-                   "exercicios": r["exercicios"]} for r in cur.fetchall()]
+                   "exercicios": r["exercicios"], "voltas": r["voltas"]} for r in cur.fetchall()]
     cur.execute("SELECT ultima_sync, ultimo_erro, chave_expira FROM garmin_estado WHERE id = 1")
     e = cur.fetchone() or {}
     return {
@@ -125,6 +125,17 @@ def excluir_sessoes_do_dia(dia) -> int:
         ids = [r[0] for r in conn.execute("SELECT id FROM sessoes WHERE data = %s", (dia,)).fetchall()]
         conn.execute(_DEVOLVER_GARMIN, (ids,))
         return conn.execute("DELETE FROM sessoes WHERE data = %s", (dia,)).rowcount
+
+
+def atualizar_sessao(s: dict) -> dict | None:
+    """Edição de um treino já salvo (histórico)."""
+    with get_db_connection() as conn, conn.transaction():
+        if conn.execute("SELECT 1 FROM sessoes WHERE id = %s", (s["id"],)).fetchone() is None:
+            return None
+        inserir_sessao(conn, s, atualizar=True)
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM sessoes WHERE id = %s", (s["id"],))
+            return sessao_para_api(cur.fetchone())
 
 
 def usar_atividade_garmin(atividade_id: int, s: dict) -> dict | None:
