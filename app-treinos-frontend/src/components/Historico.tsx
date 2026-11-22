@@ -7,10 +7,19 @@ import { weekInfo } from "../lib/semana";
 import { useStore } from "../lib/storeContext";
 import { cardioLine, doresAtivas, doresTexto, exValido, seriesText, sessoesDesc, temDor, volume } from "../lib/treino";
 import { GraficoBarras, GraficoLinha, type Ponto } from "./Graficos";
+import { DetalheTreino, Insights } from "./Insights";
+import { insightsCardio, insightsGerais, insightsMusculacao, marcasDo } from "../lib/insights";
 import { Halter, Pulso } from "./Icones";
 
 type Sub = "resumo" | "mes" | "musculacao" | "cardio" | "treinos";
 const SUBS: [Sub, string][] = [["resumo", "Semana"], ["mes", "Mês"], ["musculacao", "Musculação"], ["cardio", "Cardio"], ["treinos", "Treinos"]];
+
+/** Vermelho se algo doeu, amarelo se só incomodou. */
+function corDor(s: Sessao): React.CSSProperties | undefined {
+  const a = doresAtivas(s);
+  if (!a.length) return undefined;
+  return { color: a.some(([, v]) => v === "dor") ? "var(--bad)" : "var(--warn)" };
+}
 
 export default function Historico() {
   const [sub, setSub] = useState<Sub>("resumo");
@@ -56,6 +65,7 @@ function Resumo() {
   const km = cardio.filter((s) => ITEMS[s.item].mod === "corrida").reduce((a, s) => a + (s.cardio?.dist || 0), 0);
   const forca = sess.filter((s) => s.kind === "forca").length;
   return (
+    <>
     <div className="hero">
       <div className="card hero-main">
         <div className="hero-today">
@@ -67,8 +77,8 @@ function Resumo() {
           <Li sinal="+" nome="Musculação" v={forca} />
           <Li sinal="+" nome="Cardio" v={`${cardio.length} de ${cardioPlan}`} />
           <Li sinal="−" nome="Faltas" v={faltas} />
-          <Li sinal="−" nome="Joelho incomodou" v={joelho} />
-          <Li sinal="−" nome="Cotovelo incomodou" v={cotovelo} />
+          <Li sinal="−" nome="Joelho (incomodou ou doeu)" v={joelho} />
+          <Li sinal="−" nome="Cotovelo (incomodou ou doeu)" v={cotovelo} />
           {outras > 0 && <Li sinal="−" nome="Outras dores" v={outras} />}
         </div>
       </div>
@@ -85,6 +95,8 @@ function Resumo() {
         </div>
       </div>
     </div>
+    <Insights itens={insightsGerais(S)} titulo="Insights gerais" />
+    </>
   );
 }
 
@@ -102,7 +114,8 @@ function Mes() {
   for (let d = 1; d <= dias; d++) if (iso(d) < hoje && iso(d) >= S.inicio && !doMes.some((s) => s.data === iso(d))) semTreino++;
   const contDor: Record<string, { leve: number; dor: number }> = {};
   doMes.forEach((s) => doresAtivas(s).forEach(([k, v]) => { contDor[k] = contDor[k] || { leve: 0, dor: 0 }; contDor[k][v as "leve" | "dor"]++; }));
-  const comDor = doMes.filter((s) => doresAtivas(s).length).length;
+  const comDor = doMes.filter((s) => doresAtivas(s).some(([, v]) => v === "dor")).length;
+  const soIncomodou = doMes.filter((s) => doresAtivas(s).length && !doresAtivas(s).some(([, v]) => v === "dor")).length;
   const pm = isoOf(new Date(y, m - 2, 1)).slice(0, 7), nm = isoOf(new Date(y, m, 1)).slice(0, 7);
   const atual = mes === hoje.slice(0, 7), corte = hoje.slice(8, 10);
   const vol = forca.reduce((a, s) => a + volume(s), 0);
@@ -130,12 +143,14 @@ function Mes() {
         <div className="tile"><div className="v">{cardio.length}</div><div className="l">de cardio</div></div>
         <div className="tile"><div className="v">{semTreino}</div><div className="l">dias sem treino</div></div>
         <div className="tile"><div className="v">{fmtInt(vol)}</div><div className="l">kg de volume{dv !== null && <> · <Delta p={dv} sufixo={atual ? "vs mesmo período do mês anterior" : "vs mês anterior"} /></>}</div></div>
-        <div className="tile"><div className="v" style={comDor ? { color: "var(--bad)" } : undefined}>{comDor}</div><div className="l">treinos com alguma dor</div></div>
+        <div className="tile"><div className="v" style={comDor ? { color: "var(--bad)" } : undefined}>{comDor}</div><div className="l">treinos com dor{soIncomodou > 0 && <> · <span style={{ color: "var(--warn)" }}>{soIncomodou} só incomodou</span></>}</div></div>
       </div>
       {Object.keys(contDor).length > 0 && (
         <div className="dorlist">
           {Object.entries(contDor).sort((a, b) => b[1].leve + b[1].dor - (a[1].leve + a[1].dor)).map(([k, c]) => (
-            <span key={k} className="chip bad">{DORES[k] || k}: {c.leve + c.dor}× {c.dor ? `(${c.dor} doeu)` : ""}</span>
+            <span key={k} className={"chip " + (c.dor ? "bad" : "warn")}>
+              {DORES[k] || k}: {[c.dor && `doeu ${c.dor}×`, c.leve && `incomodou ${c.leve}×`].filter(Boolean).join(", ")}
+            </span>
           ))}
         </div>
       )}
@@ -145,12 +160,14 @@ function Mes() {
         {[...Array(lead)].map((_, i) => <div key={"o" + i} className="cell out" aria-hidden="true" />)}
         {[...Array(dias)].map((_, k) => {
           const dIso = iso(k + 1), ss = doMes.filter((s) => s.data === dIso), falta = !ss.length && dIso < hoje && dIso >= S.inicio;
-          const dores = [...new Set(ss.flatMap((s) => doresAtivas(s).map(([x]) => (DORES[x] || x).split("/")[0].toLowerCase())))];
+          const nomes = (nivel: string) => [...new Set(ss.flatMap((s) => doresAtivas(s).filter(([, v]) => v === nivel).map(([x]) => (DORES[x] || x).split("/")[0].toLowerCase())))];
+          const doeu = nomes("dor"), incomodou = nomes("leve").filter((x) => !doeu.includes(x));
           return (
             <div key={dIso} className={"cell" + (falta ? " miss" : "") + (dIso === hoje ? " today" : "")}>
               <span className="n">{k + 1}</span>
               {ss.map((s) => <span key={s.id} className="s" style={{ "--c": ITEMS[s.item].c } as React.CSSProperties}><i className="dot" /><span>{ITEMS[s.item].curto}</span></span>)}
-              {dores.length > 0 && <span className="k">dor: {dores.join(", ")}</span>}
+              {doeu.length > 0 && <span className="k">doeu: {doeu.join(", ")}</span>}
+              {incomodou.length > 0 && <span className="k leve">incomodou: {incomodou.join(", ")}</span>}
               {falta && <span className="x">sem treino</span>}
             </div>
           );
@@ -201,7 +218,8 @@ function Musculacao() {
       )}
     </div>
   );
-  if (!hist.length) return <>{seletor}<div className="empty" style={{ marginTop: 12 }}>Ainda não há registros deste exercício. Eles aparecem aqui depois do primeiro treino salvo.</div></>;
+  const geral = <Insights itens={insightsMusculacao(S)} titulo="Insights de musculação" />;
+  if (!hist.length) return <>{geral}{seletor}<div className="empty" style={{ marginTop: 12 }}>Ainda não há registros deste exercício. Eles aparecem aqui depois do primeiro treino salvo.</div></>;
   const melhor = Math.max(...hist.map((h) => h.top)), ult = hist[hist.length - 1], pri = hist[0];
   const tabela = (repsModo: boolean) => (
     <div className="chart"><h3>Registros</h3><div className="tbl-wrap"><table className="data">
@@ -216,6 +234,7 @@ function Musculacao() {
     const rp = hist.map((h) => ({ label: ddmm(h.data), y: h.reps, tip: `${fmtDateLong(h.data)}\nRepetições: ${h.reps}` }));
     return (
       <>
+        {geral}
         {seletor}
         <div className="tiles">
           <div className="tile"><div className="v">{ult.reps}</div><div className="l">repetições no último treino</div></div>
@@ -229,13 +248,17 @@ function Musculacao() {
     );
   }
   const dk = ult.top - pri.top;
+  const rms = marcasDo(S, exId, varSel).filter((m) => m.rm > 0);
+  const rmUlt = rms.length ? rms[rms.length - 1].rm : 0, rmMax = Math.max(0, ...rms.map((m) => m.rm));
   return (
     <>
+      {geral}
       {seletor}
       <div className="tiles">
         <div className="tile"><div className="v">{fmtKg(melhor)} kg</div><div className="l">maior carga registrada</div></div>
         <div className="tile"><div className="v">{fmtKg(ult.top)} kg × {ult.repsTop}</div><div className="l">série mais pesada da última vez</div></div>
         <div className="tile"><div className="v">{dk > 0 ? "+" : ""}{fmtKg(dk)} kg</div><div className="l">desde o primeiro registro</div></div>
+        <div className="tile"><div className="v">{fmtKg(Math.round(rmUlt))} kg</div><div className="l">1RM estimado agora (máx. {fmtKg(Math.round(rmMax))} kg)</div></div>
         <div className="tile"><div className="v">{hist.length}</div><div className="l">treinos registrados</div></div>
       </div>
       <div className="charts2">
@@ -324,6 +347,7 @@ function CardioHist() {
   return (
     <>
       {seg}
+      <Insights itens={insightsCardio(S, mod)} titulo="Insights de cardio" />
       <div className="tiles">
         <div className="tile"><div className="v">{doMes.length}</div><div className="l">treinos neste mês</div></div>
         <div className="tile"><div className="v">{big(soma(doMes, "dist"))}</div><div className="l">no mês</div></div>
@@ -360,7 +384,7 @@ function CardioHist() {
               <td className="mono">{c.dist ? fmtDist(c.dist, mod) : "—"}</td><td className="mono">{fmtDur(c.dur_s)}</td>
               <td className="mono">{c.dist && c.dur_s ? fmtRitmo(c.dist, c.dur_s, mod) : "—"}</td>
               <td className="mono">{c.fc ? c.fc + " bpm" : "—"}</td><td>{s.sensacao ? SENSACAO[s.sensacao] : "—"}</td>
-              <td style={doresAtivas(s).length ? { color: "var(--bad)" } : undefined}>{doresTexto(s, true) || "—"}</td><td className="mono">{s.notas}</td>
+              <td style={corDor(s)}>{doresTexto(s, true) || "—"}</td><td className="mono">{s.notas}</td>
             </tr>
           );
         })}</tbody>
@@ -374,6 +398,7 @@ function Lista() {
   const { S } = store;
   const [filtro, setFiltro] = useState("todos");
   const [apagar, setApagar] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<string | null>(null);
   const filtros: [string, string][] = [["todos", "Todos"], ["A", "Peito"], ["B", "Costas"], ["C", "Ombro"], ["D", "Perna"], ["cardio", "Cardio"]];
   const desc = sessoesDesc(S);
   const lista = desc.filter((s) => filtro === "todos" || (filtro === "cardio" ? s.kind === "cardio" : s.item === filtro));
@@ -395,9 +420,11 @@ function Lista() {
                   <h3>{it.nome}</h3><span className="date">{fmtDateLong(s.data)}</span>
                   {s.kind === "forca" && <><span className="vol">Volume {fmtInt(v)} kg</span><Delta p={p} sufixo="vs anterior" /></>}
                   {s.kind === "cardio" && cardioLine(s) && <span className="vol">{cardioLine(s)}</span>}
-                  {dores && <span className="sub" style={doresAtivas(s).length ? { color: "var(--bad)" } : undefined}>{dores}</span>}
+                  {dores && <span className="sub" style={corDor(s)}>{dores}</span>}
                   {s.sensacao && <span className="sub">Sensação: {SENSACAO[s.sensacao]}</span>}
                   <span className="spacer" />
+                  <button className={"btn small" + (aberto === s.id ? " primary" : "")} type="button" aria-expanded={aberto === s.id}
+                    onClick={() => setAberto(aberto === s.id ? null : s.id)}>{aberto === s.id ? "Fechar" : "Abrir treino"}</button>
                   {apagar === s.id ? (
                     <span className="inline-confirm">Excluir este registro?
                       <button className="btn small danger" type="button" onClick={async () => { await store.excluirSessao(s.id); setApagar(null); store.aviso("Registro excluído"); }}>Excluir</button>
@@ -406,8 +433,9 @@ function Lista() {
                   ) : <button className="btn small" type="button" onClick={() => setApagar(s.id)}>Excluir</button>}
                 </div>
                 {s.rapido && <p className="sub" style={{ margin: "6px 0 0" }}>Registro rápido, sem séries anotadas.</p>}
-                {s.notas && <p className="sub" style={{ margin: "6px 0 0" }}>{s.notas}</p>}
-                {s.kind === "forca" && !s.rapido && (
+                {aberto !== s.id && s.notas && <p className="sub" style={{ margin: "6px 0 0" }}>{s.notas}</p>}
+                {aberto === s.id && <DetalheTreino s={s} />}
+                {aberto !== s.id && s.kind === "forca" && !s.rapido && (
                   <details><summary>Ver séries</summary><ul>
                     {(s.exercicios || []).map((e) => (
                       <li key={e.id}><span>{e.nome}{e.varNome ? ` · ${e.varNome}` : ""}</span>
