@@ -125,7 +125,8 @@ def resumo_da_lista(a: dict) -> dict:
 
 def _cliente(chave: str):
     from garmin_personal_api import GarminPersonalApiClient, PersonalApiAuthenticator
-    with PersonalApiAuthenticator() as auth:
+    # Na Lambda só /tmp aceita escrita; o cliente guarda ali o token (vale 24 h e é reaproveitado entre execuções)
+    with PersonalApiAuthenticator(bearer_token_cache_file="/tmp/garmin-token.json") as auth:
         token = auth.obtain_token(chave)
     return GarminPersonalApiClient(token.access_token)
 
