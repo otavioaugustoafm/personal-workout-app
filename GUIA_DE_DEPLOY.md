@@ -343,10 +343,11 @@ confirmação. Toque em **Revisar**, confira e **Confirmar e salvar**.
 ## Fase 3: sono, recuperação, prontidão e análises com IA
 
 O que entra: a Lambda de sincronização passa a trazer **sono, HRV, Body Battery, FC de repouso e estresse**; o app calcula
-a **prontidão do dia** (nota 0–100, sem IA) e a **IA** (API do Claude) escreve as análises: prontidão de manhã (Haiku 5.5),
-cada treino salvo e a revisão da semana (Sonnet 5.5), e as análises sob demanda de Musculação, Cardio e Sono (Sonnet 5.5).
+a **prontidão do dia** (nota 0–100, sem IA) e a **IA** (API do Claude) escreve as análises: prontidão de manhã e cada
+treino salvo (Haiku 5.5), a revisão da semana e as análises sob demanda de Musculação, Cardio e Sono (Sonnet 5.5).
 
-Custo previsto: **~US$ 1,40/mês**. O app para as análises automáticas em **US$ 1,80** no mês e as que você pede em **US$ 2,00**.
+Custo previsto: **~US$ 1,50/mês** (os modelos 5.5 sempre "pensam" antes de responder, e esse raciocínio é cobrado como saída;
+o app usa esforço médio ou baixo para controlar isso). O app para as análises automáticas em **US$ 1,80** no mês e as que você pede em **US$ 2,00**.
 A trava final é o limite de gasto no console da Anthropic (passo F3.3). Não precisa de agendamento novo: a prontidão é
 gerada quando você abre o app e o sono do dia já chegou; a revisão da semana, quando você abre Histórico → Semana.
 
@@ -382,7 +383,8 @@ Opcionais (só se quiser mudar o padrão):
 
 | Variável | Padrão | Para quê |
 |---|---|---|
-| `IA_MODELO` | `claude-sonnet-5-5` | treino, semana e análises sob demanda (ex.: `claude-opus-5-5` para mais profundidade) |
+| `IA_MODELO` | `claude-sonnet-5-5` | semana e análises sob demanda (ex.: `claude-opus-5-5` para mais profundidade) |
+| `IA_MODELO_TREINO` | `claude-haiku-5-5` | análise de cada treino (troque por `claude-sonnet-5-5` se quiser mais profundidade: ~+US$ 1/mês) |
 | `IA_MODELO_RAPIDO` | `claude-haiku-5-5` | prontidão do dia |
 | `IA_LIMITE_AUTO_USD` | `1.80` | teto do mês para as análises automáticas |
 | `IA_LIMITE_USD` | `2.00` | teto do mês para as que você pede |

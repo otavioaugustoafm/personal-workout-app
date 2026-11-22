@@ -34,7 +34,7 @@ interface Props { tipo: TipoIA; chave: string; titulo: string; auto?: boolean; v
 export function AnaliseIA({ tipo, chave, titulo, auto = false, vazio }: Props) {
   const store = useStore();
   const ia = store.S.ia;
-  const analise = ia?.analises.find((a) => a.tipo === tipo && a.chave === chave);
+  const analise = ia?.analises.find((a) => a.tipo === tipo && a.chave === chave && a.texto.trim());
   const [gerando, setGerando] = useState(false);
   const [falhouAuto, setFalhouAuto] = useState(false);
   const id = tipo + ":" + chave;

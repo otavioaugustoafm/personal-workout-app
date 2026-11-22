@@ -101,7 +101,7 @@ export function DetalheTreino({ s }: { s: Sessao }) {
           </div>
         </div>
       )}
-      {!s.rapido && <AnaliseIA tipo="treino" chave={s.id} titulo="Análise deste treino" vazio="Os treinos novos são analisados sozinhos ao salvar. Para este, toque em Gerar análise (Sonnet 5.5, ~US$ 0,02)." />}
+      {!s.rapido && <AnaliseIA tipo="treino" chave={s.id} titulo="Análise deste treino" vazio="Os treinos novos são analisados sozinhos ao salvar. Para este, toque em Gerar análise (Haiku 5.5, ~US$ 0,005)." />}
       <span className="sub">Registrado em {fmtDateLong(s.data)}{g ? " · com dados do Garmin" : ""}.</span>
     </div>
   );

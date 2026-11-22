@@ -34,7 +34,7 @@ export default function SonoHist() {
         <div className="tile"><div className="v">{f0(fc7)}<small style={{ fontSize: ".45em", opacity: .6, marginLeft: 4 }}>bpm</small></div><div className="l">FC de repouso (7 dias){fcAnt ? ` · antes ${f0(fcAnt)}` : ""}</div></div>
         <div className="tile"><div className="v">{f0(bb7)}</div><div className="l">Body Battery máxima (7 dias)</div></div>
       </div>
-      <AnaliseIA tipo="sono" chave={hoje} titulo="Sono e recuperação" vazio="Toque em Gerar análise para cruzar 8 semanas de sono, HRV e Body Battery com os seus treinos (Sonnet 5.5, ~US$ 0,05)." />
+      <AnaliseIA tipo="sono" chave={hoje} titulo="Sono e recuperação" vazio="Toque em Gerar análise para cruzar 8 semanas de sono, HRV e Body Battery com os seus treinos (Sonnet 5.5, ~US$ 0,08)." />
       <div className="charts2">
         <div className="chart"><h3>Prontidão</h3><div className="cap">Nota de 0 a 100 por dia (30 dias).</div>
           <GraficoLinha pts={pts((d) => d.prontidao?.nota, (_, v) => `Prontidão ${v}`)} unidade="" fmt={(n) => String(Math.round(n))} /></div>

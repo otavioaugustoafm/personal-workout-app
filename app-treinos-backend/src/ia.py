@@ -19,6 +19,7 @@ BRASILIA = timezone(timedelta(hours=-3))
 URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com").rstrip("/") + "/v1/messages"
 
 MODELO_RAPIDO = os.getenv("IA_MODELO_RAPIDO", "claude-haiku-5-5").strip()
+MODELO_TREINO = os.getenv("IA_MODELO_TREINO", "claude-haiku-5-5").strip()
 MODELO = os.getenv("IA_MODELO", "claude-sonnet-5-5").strip()
 LIMITE_AUTO = float(os.getenv("IA_LIMITE_AUTO_USD", "1.80"))
 LIMITE = float(os.getenv("IA_LIMITE_USD", "2.00"))
@@ -31,30 +32,31 @@ PRECOS = {
 }
 
 TIPOS = {
-    # tipo: (modelo, max_tokens, o que pedir)
-    "prontidao": (MODELO_RAPIDO, 700, """Analise a PRONTIDÃO DE HOJE ({chave}).
+    # tipo: (modelo, esforço, o que pedir). Os modelos 5.5 sempre "pensam" antes de responder e esse raciocínio
+    # conta como saída: o esforço controla quanto ele pensa (e o custo). max_tokens fica folgado (só se paga o usado).
+    "prontidao": (MODELO_RAPIDO, "medium", """Analise a PRONTIDÃO DE HOJE ({chave}).
 Comece com uma frase que diga como ele está e por quê, citando os números que mais pesaram (compare com a média e a faixa dele).
 Depois, em 2 a 4 tópicos, diga exatamente o que fazer com o treino planejado de hoje: manter, aliviar ou trocar; para musculação,
 cargas e séries concretas a partir do último treino dessa ficha (quais exercícios subir, manter ou reduzir); para cardio, zona ou
 limite de FC, ritmo e distância. Se algo pede atenção (dor recente, sono ruim seguido, carga subindo rápido), um tópico só para isso.
 Até 140 palavras."""),
-    "treino": (MODELO, 900, """Analise o TREINO {chave} (o primeiro da lista "Treino analisado").
+    "treino": (MODELO_TREINO, "medium", """Analise o TREINO {chave} (o primeiro da lista "Treino analisado").
 Compare com as vezes anteriores da mesma ficha ou modalidade, com números: o que progrediu, o que caiu ou travou.
 Relacione com o sono, o HRV e a Body Battery da noite anterior e com dores, quando houver relação clara.
 Termine com 2 a 3 sugestões concretas para a próxima vez dessa ficha/modalidade (exercício, carga, reps; ou ritmo, FC, distância).
 Até 200 palavras."""),
-    "semana": (MODELO, 1500, """Faça a REVISÃO DA SEMANA que começa em {chave}.
+    "semana": (MODELO, "medium", """Faça a REVISÃO DA SEMANA que começa em {chave}.
 Cubra: o que foi feito contra a semana padrão; carga de musculação e quilometragem contra as semanas anteriores; sono, HRV,
 Body Battery e FC de repouso e a tendência; dores; e os padrões que aparecem ao cruzar esses dados (ex.: rendimento depois de
 noites ruins). Termine com um plano de ajustes concreto para a próxima semana. Até 320 palavras."""),
-    "musculacao": (MODELO, 1200, """Analise a MUSCULAÇÃO das últimas 8 semanas.
+    "musculacao": (MODELO, "low", """Analise a MUSCULAÇÃO das últimas 8 semanas.
 Por exercício, quem está progredindo, estagnado ou caindo (com cargas e datas). Aponte desequilíbrios entre as fichas,
 exercícios pulados com frequência e relação com dores. Termine com as 3 prioridades para as próximas 2 semanas, com cargas-alvo.
 Até 280 palavras."""),
-    "cardio": (MODELO, 1200, """Analise o CARDIO das últimas 12 semanas (corrida, bike, natação).
+    "cardio": (MODELO, "low", """Analise o CARDIO das últimas 12 semanas (corrida, bike, natação).
 Volume semanal e progressão (alerta se subir rápido demais), ritmo e eficiência (velocidade por batimento), evolução do longão,
 joelho, e a relação com sono e recuperação. Termine com o que ajustar nas próximas 2 semanas. Até 280 palavras."""),
-    "sono": (MODELO, 1200, """Analise SONO E RECUPERAÇÃO das últimas 8 semanas.
+    "sono": (MODELO, "low", """Analise SONO E RECUPERAÇÃO das últimas 8 semanas.
 Padrões de duração, fases, nota, HRV, Body Battery e FC de repouso; como os treinos afetam a noite seguinte (ex.: depois de perna
 ou de longão) e como as noites afetam o rendimento no dia seguinte. Termine com 3 recomendações práticas. Até 280 palavras."""),
 }
@@ -286,12 +288,13 @@ class LimiteAtingido(Exception):
     pass
 
 
-def _chamar(modelo: str, max_tokens: int, sistema: str, conteudo: str) -> tuple[str, int, int]:
+def _chamar(modelo: str, esforco: str, sistema: str, conteudo: str) -> tuple[str, int, int]:
     r = requests.post(URL, timeout=55, headers={
         "x-api-key": os.environ["ANTHROPIC_API_KEY"].strip(),
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
-    }, json={"model": modelo, "max_tokens": max_tokens, "system": sistema, "messages": [{"role": "user", "content": conteudo}]})
+    }, json={"model": modelo, "max_tokens": 16000, "output_config": {"effort": esforco},
+             "system": sistema, "messages": [{"role": "user", "content": conteudo}]})
     if r.status_code != 200:
         try:
             msg = r.json().get("error", {}).get("message", "")
@@ -301,6 +304,8 @@ def _chamar(modelo: str, max_tokens: int, sistema: str, conteudo: str) -> tuple[
     corpo = r.json()
     texto = "".join(b.get("text", "") for b in corpo.get("content", []) if b.get("type") == "text").strip()
     u = corpo.get("usage") or {}
+    if not texto:
+        raise RuntimeError(f"A IA não devolveu texto (parou por: {corpo.get('stop_reason')}). Tente de novo.")
     return texto, int(u.get("input_tokens") or 0), int(u.get("output_tokens") or 0)
 
 
@@ -312,16 +317,16 @@ def analisar(tipo: str, chave: str, forcar: bool = False, auto: bool = False, ch
         with get_db_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
             cur.execute("SELECT * FROM analises_ia WHERE tipo = %s AND chave = %s", (tipo, chave))
             r = cur.fetchone()
-            if r:
+            if r and r["texto"].strip():
                 return analise_para_api(r)
     gasto = gasto_do_mes()
     if gasto >= (LIMITE_AUTO if auto else LIMITE):
         raise LimiteAtingido(f"Teto do mês atingido (US$ {gasto:.2f}).")
-    modelo, max_tokens, pedido = TIPOS[tipo]
+    modelo, esforco, pedido = TIPOS[tipo]
     hoje = datetime.now(BRASILIA).date()
     dados, contexto = montar_contexto(tipo, chave, hoje)
     sistema = SISTEMA.format(contexto=contexto.strip() or "(sem descrição)")
-    texto, tin, tout = (chamar or _chamar)(modelo, max_tokens, sistema, f"{pedido.format(chave=chave)}\n\nDados:\n{dados}")
+    texto, tin, tout = (chamar or _chamar)(modelo, esforco, sistema, f"{pedido.format(chave=chave)}\n\nDados:\n{dados}")
     c = custo(modelo, tin, tout)
     with get_db_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(

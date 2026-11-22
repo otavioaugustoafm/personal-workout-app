@@ -100,7 +100,7 @@ function Resumo() {
     </div>
     <AnaliseIA tipo="semana" chave={w.dates[0]} titulo="Esta semana"
       auto={dow(isoToday()) === 6 && new Date().getHours() >= 18}
-      vazio="No domingo à noite a revisão sai sozinha. Antes disso, toque em Gerar análise para ver como a semana está indo (Sonnet 5.5, ~US$ 0,07)." />
+      vazio="No domingo à noite a revisão sai sozinha. Antes disso, toque em Gerar análise para ver como a semana está indo (Sonnet 5.5, ~US$ 0,12)." />
     {addDays(w.dates[0], -7) >= S.inicio && S.sessoes.some((s) => s.data >= addDays(w.dates[0], -7) && s.data < w.dates[0]) && (
       <AnaliseIA tipo="semana" chave={addDays(w.dates[0], -7)} titulo="Semana passada" auto />
     )}
@@ -227,7 +227,7 @@ function Musculacao() {
     </div>
   );
   const geral = <AnaliseIA tipo="musculacao" chave={isoToday()} titulo="Musculação nas últimas 8 semanas"
-    vazio="Toque em Gerar análise: progressão, cargas paradas e prioridades por exercício (Sonnet 5.5, ~US$ 0,05)." />;
+    vazio="Toque em Gerar análise: progressão, cargas paradas e prioridades por exercício (Sonnet 5.5, ~US$ 0,08)." />;
   if (!hist.length) return <>{geral}{seletor}<div className="empty" style={{ marginTop: 12 }}>Ainda não há registros deste exercício. Eles aparecem aqui depois do primeiro treino salvo.</div></>;
   const melhor = Math.max(...hist.map((h) => h.top)), ult = hist[hist.length - 1], pri = hist[0];
   const tabela = (repsModo: boolean) => (
@@ -357,7 +357,7 @@ function CardioHist() {
     <>
       {seg}
       <AnaliseIA tipo="cardio" chave={isoToday()} titulo="Cardio nas últimas 12 semanas"
-        vazio="Toque em Gerar análise: volume, ritmo, eficiência, longão, joelho e sono (Sonnet 5.5, ~US$ 0,05)." />
+        vazio="Toque em Gerar análise: volume, ritmo, eficiência, longão, joelho e sono (Sonnet 5.5, ~US$ 0,08)." />
       <div className="tiles">
         <div className="tile"><div className="v">{doMes.length}</div><div className="l">treinos neste mês</div></div>
         <div className="tile"><div className="v">{big(soma(doMes, "dist"))}</div><div className="l">no mês</div></div>
